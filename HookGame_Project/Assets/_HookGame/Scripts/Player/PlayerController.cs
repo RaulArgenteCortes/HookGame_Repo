@@ -27,6 +27,7 @@ public class PlayerController : MonoBehaviour
     public float hookAngle;
 
     [Header("Object References")]
+    [SerializeField] GameObject wheelGO;
     [SerializeField] Rigidbody bodyRB;
     [SerializeField] Rigidbody wheelRB;
     [SerializeField] SpringJoint joint;
@@ -117,7 +118,7 @@ public class PlayerController : MonoBehaviour
             jointCurrentLength = Mathf.MoveTowards(
                 jointCurrentLength,
                 jointDefaultLength,
-                jointSpeed * Time.deltaTime
+                jointSpeed * 10 * Time.deltaTime
             );
         }
         else
@@ -125,7 +126,7 @@ public class PlayerController : MonoBehaviour
             jointCurrentLength = Mathf.MoveTowards(
                 jointCurrentLength,
                 jointChargedLength,
-                jointSpeed * 10 * Time.deltaTime
+                jointSpeed * Time.deltaTime
             );
         }
 
@@ -150,7 +151,7 @@ public class PlayerController : MonoBehaviour
     {
         bodyRB.AddForce(
             0,
-            jumpForce * 100 * jointDefaultLength - jointCurrentLength,
+            jumpForce * 100 * (jointDefaultLength + jointChargedLength - jointCurrentLength),
             0
         );
     }
