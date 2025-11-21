@@ -9,49 +9,69 @@ public class PlayerController : MonoBehaviour
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
-    [SerializeField] float currentSpeed;
+    public float currentSpeed;
     [SerializeField] float maxSpeed;
     [SerializeField] float acceleration;
     [SerializeField] float maxTilt;
 
     [Header("Jump Stats")]
     [SerializeField] bool chargingJump;
-    [SerializeField] float jointCurrentLength;
-    [SerializeField] float jointDefaultLength;
-    [SerializeField] float jointChargedLength;
-    [SerializeField] float jointSpeed;
     [SerializeField] float jumpForce;
 
     [Header("Hook Stats")]
     public float hookAngle;
 
-    [Header("Object References")]
-    [SerializeField] GameObject wheelGO;
+    [Header("Joint Stats")]
+    [SerializeField] float jointCurrentLength;
+    [SerializeField] float jointTargetLength;
+    [SerializeField] float jointDefaultLength;
+    [SerializeField] float jointChargedLength;
+    [SerializeField] float jointSpeed;
+    [SerializeField] bool canRecoil;
+
+    [Header("GroundCheck Stats")]
+    [SerializeField] bool bodyOnGround;
+    [SerializeField] float bodyCheckRadius;
+    [SerializeField] bool wheelOnGround;
+    [SerializeField] float wheelCheckRadius;
+    // Layers
+    [SerializeField] LayerMask groundLayer;
+
+    [Header("External References")]
     [SerializeField] Rigidbody bodyRB;
     [SerializeField] Rigidbody wheelRB;
+    [SerializeField] SphereCollider bodyCollider;
+    [SerializeField] SphereCollider wheelCollider;
     [SerializeField] SpringJoint joint;
     [SerializeField] GameObject aimer;
     [SerializeField] GameObject bodyMesh;
     [SerializeField] GameObject wheelMesh;
 
-    #region Awake/Start Functions
-    private void Awake()
+#region Awake/Start Functions
+    private void Start()
     {
-        
-    }
-    #endregion
+        jointCurrentLength = jointDefaultLength;
 
-    #region Update Functions
+        bodyCheckRadius = bodyCollider.radius + 0.25f;
+        wheelCheckRadius = wheelCollider.radius + 0.25f;
+    }
+#endregion
+
+#region Update Functions
     private void Update()
     {
+        TiltPlayer();
+
+        JointLenght();
+
         RotateHook();
+
+        LayerCheck();
     }
 
     private void FixedUpdate()
     {
         MovePlayer();
-
-        TiltPlayer();
 
         ModifyJoint();
     }
@@ -59,6 +79,57 @@ public class PlayerController : MonoBehaviour
     private void LateUpdate()
     {
         CreateGravity();
+    }
+
+    private void TiltPlayer()
+    {
+        // Tilts the player according to the current speed.
+        transform.rotation = Quaternion.Euler(
+            0,
+            0,
+            maxTilt * -currentSpeed
+        );
+
+        wheelRB.transform.localPosition = new Vector3(
+            0,
+            wheelRB.transform.localPosition.y,
+            0
+        );
+
+        // Prevents the body mesh from tilting.
+        bodyMesh.transform.rotation = Quaternion.Euler(0, 0, 0);
+    }
+
+    private void JointLenght()
+    {
+        if (!wheelOnGround && jointCurrentLength >= jointDefaultLength)
+        {
+            canRecoil = true;
+        }
+        else if (bodyOnGround)
+        {
+            canRecoil = false;
+        }
+
+        // Defines the target lenght and speed.
+        if (canRecoil)
+        {
+            jointTargetLength = 0;
+            jointSpeed = 5;
+        }
+        else
+        {
+            if (chargingJump)
+            {
+                jointTargetLength = jointChargedLength;
+                jointSpeed = 1;
+            }
+            else
+            {
+                jointTargetLength = jointDefaultLength;
+                jointSpeed = 10;
+            }
+        }
     }
 
     private void RotateHook()
@@ -79,60 +150,45 @@ public class PlayerController : MonoBehaviour
         );
     }
 
+    private void LayerCheck()
+    {
+        bodyOnGround = Physics.CheckSphere(transform.position, bodyCheckRadius, groundLayer);
+        wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, wheelCheckRadius, groundLayer);
+    }
+
     private void MovePlayer()
     {
-        // Modifies the player's speed.
-        currentSpeed = Mathf.MoveTowards(
-            currentSpeed,
-            maxSpeed * moveInput.x,
-            acceleration * Time.deltaTime
-        );
+        if (wheelOnGround)  // Prevents controlling the movement on air.
+        {
+            // Modifies the player's speed.
+            currentSpeed = Mathf.MoveTowards(
+                currentSpeed,
+                maxSpeed * moveInput.x,
+                acceleration * Time.deltaTime
+            );
+        }
 
         // Applies the player's speed.
         transform.position = new Vector3(
-            transform.position.x + currentSpeed/10, // Divides it by 10 so the player doesn't go so fast.
+            transform.position.x + currentSpeed / 10, // Divides it by 10 so the player doesn't go so fast.
             transform.position.y,
             0
         );
     }
 
-    private void TiltPlayer()
-    {
-        // Tilts the player according to the current speed.
-        transform.rotation = Quaternion.Euler(
-            0,
-            0,
-            maxTilt * -currentSpeed
-        );
-
-        // Prevents the body mesh from tilting.
-        bodyMesh.transform.rotation = Quaternion.Euler(0, 0, 0);
-    }
-
     private void ModifyJoint()
     {
         // Modifies the player's joint length.
-        if (!chargingJump)
-        {
-            jointCurrentLength = Mathf.MoveTowards(
-                jointCurrentLength,
-                jointDefaultLength,
-                jointSpeed * 10 * Time.deltaTime
-            );
-        }
-        else
-        {
-            jointCurrentLength = Mathf.MoveTowards(
-                jointCurrentLength,
-                jointChargedLength,
-                jointSpeed * Time.deltaTime
-            );
-        }
+        jointCurrentLength = Mathf.MoveTowards(
+            jointCurrentLength,
+            jointTargetLength,
+            jointSpeed * Time.deltaTime
+        );
 
         // Applies the player's joint length.
         joint.connectedAnchor = new Vector3(
             joint.connectedAnchor.x,
-            jointCurrentLength,
+            jointCurrentLength + (moveInput.y/10),
             joint.connectedAnchor.z
         );
     }
@@ -143,20 +199,23 @@ public class PlayerController : MonoBehaviour
         bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
         wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
     }
-    #endregion
+#endregion
 
-    #region Action Functions
+#region Action Functions
     private void Jump()
     {
-        bodyRB.AddForce(
-            0,
-            jumpForce * 100 * (jointDefaultLength + jointChargedLength - jointCurrentLength),
-            0
-        );
+        if (wheelOnGround)
+        {
+            bodyRB.AddForce(
+                0,
+                jumpForce * 100 * (jointDefaultLength + jointChargedLength - jointCurrentLength),
+                0
+            );
+        } 
     }
-    #endregion
+#endregion
 
-    #region Input Functions
+#region Input Functions
     public void OnMove(InputAction.CallbackContext context)
     {
         moveInput = context.ReadValue<Vector2>();
@@ -176,8 +235,7 @@ public class PlayerController : MonoBehaviour
         if (context.canceled)
         {
             Jump();
-            Debug.Log("Jump!");
         }
     }
-    #endregion
+#endregion
 }
