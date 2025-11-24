@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -170,7 +171,7 @@ public class PlayerController : MonoBehaviour
 
         // Applies the player's speed.
         transform.position = new Vector3(
-            transform.position.x + currentSpeed / 10, // Divides it by 10 so the player doesn't go so fast.
+            transform.position.x + currentSpeed/10, // Divides it by 10 so the player doesn't go so fast.
             transform.position.y,
             0
         );
