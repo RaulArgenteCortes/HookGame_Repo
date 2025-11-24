@@ -7,7 +7,6 @@ public class PlayerController : MonoBehaviour
     [Header("Physics Stats")]
     [SerializeField] float bodyWeight;
     [SerializeField] float wheelWeight;
-    [SerializeField] bool touchingWall; //touchingWall ? 0.1f : 1f
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
@@ -15,6 +14,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float maxSpeed;
     [SerializeField] float acceleration;
     [SerializeField] float maxTilt;
+    [SerializeField] bool touchingWall;
 
     [Header("Jump Stats")]
     [SerializeField] bool chargingJump;
@@ -32,10 +32,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] bool canRecoil;
 
     [Header("GroundCheck Stats")]
-    [SerializeField] bool bodyOnGround;
     [SerializeField] float bodyCheckRadius;
-    [SerializeField] bool wheelOnGround;
     [SerializeField] float wheelCheckRadius;
+    [SerializeField] bool bodyOnGround;
+    [SerializeField] bool wheelOnGround;
     // Layers
     [SerializeField] LayerMask groundLayer;
 
@@ -70,7 +70,7 @@ public class PlayerController : MonoBehaviour
 
         LayerCheck();
 
-        if (bodyRB.linearVelocity.x == 0 && moveInput != Vector2.zero)
+        if (bodyRB.linearVelocity.x == 0 && moveInput.x != 0)
         {
             touchingWall = true;
         }
@@ -171,14 +171,14 @@ public class PlayerController : MonoBehaviour
             // Modifies the player's speed.
             currentSpeed = Mathf.MoveTowards(
                 currentSpeed,
-                maxSpeed * moveInput.x,
+                maxSpeed * moveInput.x * (touchingWall ? 0.1f : 1f), // If touching a wall, slows the player.
                 acceleration * Time.fixedDeltaTime
             );
         }
 
         // Applies the player's speed.
         bodyRB.MovePosition(new Vector3(
-            bodyRB.transform.position.x + currentSpeed / 10, // Divides it by 10 so the player doesn't go so fast.
+            bodyRB.transform.position.x + currentSpeed/10, // Divides it by 10 so the player doesn't go too fast.
             bodyRB.transform.position.y,
             0
         ));
@@ -213,22 +213,7 @@ public class PlayerController : MonoBehaviour
     }
     #endregion
 
-    #region Action Functions
-    /*private void OnCollisionEnter(Collision collision)
-    {
-        if (collision.gameObject.layer == groundLayer)
-        {
-            touchingWall = true;
-        }
-    }
-    private void OnCollisionExit(Collision collision)
-    {
-        if (collision.gameObject.layer == groundLayer)
-        {
-            touchingWall = false;
-        }
-    }*/
-
+#region Action Functions
     private void Jump()
     {
         if (wheelOnGround)
