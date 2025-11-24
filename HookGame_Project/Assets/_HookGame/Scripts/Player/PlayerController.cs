@@ -7,6 +7,7 @@ public class PlayerController : MonoBehaviour
     [Header("Physics Stats")]
     [SerializeField] float bodyWeight;
     [SerializeField] float wheelWeight;
+    [SerializeField] bool touchingWall; //touchingWall ? 0.1f : 1f
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
@@ -68,6 +69,15 @@ public class PlayerController : MonoBehaviour
         RotateHook();
 
         LayerCheck();
+
+        if (bodyRB.linearVelocity.x == 0 && moveInput != Vector2.zero)
+        {
+            touchingWall = true;
+        }
+        else
+        {
+            touchingWall = false;
+        }
     }
 
     private void FixedUpdate()
@@ -75,10 +85,7 @@ public class PlayerController : MonoBehaviour
         MovePlayer();
 
         ModifyJoint();
-    }
 
-    private void LateUpdate()
-    {
         CreateGravity();
     }
 
@@ -165,16 +172,20 @@ public class PlayerController : MonoBehaviour
             currentSpeed = Mathf.MoveTowards(
                 currentSpeed,
                 maxSpeed * moveInput.x,
-                acceleration * Time.deltaTime
+                acceleration * Time.fixedDeltaTime
             );
         }
 
         // Applies the player's speed.
-        transform.position = new Vector3(
-            transform.position.x + currentSpeed/10, // Divides it by 10 so the player doesn't go so fast.
-            transform.position.y,
+        bodyRB.MovePosition(new Vector3(
+            bodyRB.transform.position.x + currentSpeed / 10, // Divides it by 10 so the player doesn't go so fast.
+            bodyRB.transform.position.y,
             0
-        );
+        ));
+
+        // Prevents the player for gaining unwanted momentum.
+        bodyRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
+        bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
     }
 
     private void ModifyJoint()
@@ -200,9 +211,24 @@ public class PlayerController : MonoBehaviour
         bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
         wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
     }
-#endregion
+    #endregion
 
-#region Action Functions
+    #region Action Functions
+    /*private void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.layer == groundLayer)
+        {
+            touchingWall = true;
+        }
+    }
+    private void OnCollisionExit(Collision collision)
+    {
+        if (collision.gameObject.layer == groundLayer)
+        {
+            touchingWall = false;
+        }
+    }*/
+
     private void Jump()
     {
         if (wheelOnGround)
