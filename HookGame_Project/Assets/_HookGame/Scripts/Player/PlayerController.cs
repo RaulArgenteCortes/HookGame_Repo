@@ -31,9 +31,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float jointSpeed;
     [SerializeField] bool canRecoil;
 
-    [Header("GroundCheck Stats")]
-    [SerializeField] float bodyCheckRadius;
-    [SerializeField] float wheelCheckRadius;
+    [Header("LayerCheck Stats")]
+    [SerializeField] float CheckRadius;
+    private float bodyCheckRadius;
+    private float wheelCheckRadius;
     [SerializeField] bool bodyOnGround;
     [SerializeField] bool wheelOnGround;
     // Layers
@@ -42,24 +43,24 @@ public class PlayerController : MonoBehaviour
     [Header("External References")]
     [SerializeField] Rigidbody bodyRB;
     [SerializeField] Rigidbody wheelRB;
-    [SerializeField] SphereCollider bodyCollider;
     [SerializeField] SphereCollider wheelCollider;
     [SerializeField] SpringJoint joint;
+    [SerializeField] GameObject connector;
+    [SerializeField] GameObject bodyCheck;
     [SerializeField] GameObject aimer;
     [SerializeField] GameObject bodyMesh;
-    [SerializeField] GameObject wheelMesh;
 
-#region Awake/Start Functions
+    #region Awake/Start Functions
     private void Start()
     {
         jointCurrentLength = jointDefaultLength;
 
-        bodyCheckRadius = bodyCollider.radius + 0.25f;
-        wheelCheckRadius = wheelCollider.radius + 0.25f;
+        bodyCheckRadius = CheckRadius;
+        wheelCheckRadius = wheelCollider.radius + CheckRadius;
     }
-#endregion
+    #endregion
 
-#region Update Functions
+    #region Update Functions
     private void Update()
     {
         TiltPlayer();
@@ -69,6 +70,8 @@ public class PlayerController : MonoBehaviour
         RotateHook();
 
         LayerCheck();
+
+        ComponentTransform();
 
         if (bodyRB.linearVelocity.x == 0 && moveInput.x != 0)
         {
@@ -103,9 +106,6 @@ public class PlayerController : MonoBehaviour
             wheelRB.transform.localPosition.y,
             0
         );
-
-        // Prevents the body mesh from tilting.
-        bodyMesh.transform.rotation = Quaternion.Euler(0, 0, 0);
     }
 
     private void JointLenght()
@@ -119,7 +119,7 @@ public class PlayerController : MonoBehaviour
             canRecoil = false;
         }
 
-        // Defines the target lenght and speed.
+        // Defines the target lenght and speed of the joint.
         if (canRecoil)
         {
             jointTargetLength = 0;
@@ -137,7 +137,7 @@ public class PlayerController : MonoBehaviour
                 jointTargetLength = jointDefaultLength;
                 jointSpeed = 10;
             }
-        }
+        } 
     }
 
     private void RotateHook()
@@ -160,13 +160,22 @@ public class PlayerController : MonoBehaviour
 
     private void LayerCheck()
     {
-        bodyOnGround = Physics.CheckSphere(transform.position, bodyCheckRadius, groundLayer);
+        bodyOnGround = Physics.CheckSphere(bodyCheck.transform.position, bodyCheckRadius, groundLayer);
         wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, wheelCheckRadius, groundLayer);
+    }
+
+    private void ComponentTransform()
+    {
+        // Prevents the body mesh from tilting.
+        bodyMesh.transform.rotation = Quaternion.Euler(-90, 0, 0);
+
+        // Modiffies the connector
+        connector.transform.localPosition = wheelRB.transform.localPosition / 2;
     }
 
     private void MovePlayer()
     {
-        if (wheelOnGround)  // Prevents controlling the movement on air.
+        if (wheelOnGround) // Prevents controlling the movement on air.
         {
             // Modifies the player's speed.
             currentSpeed = Mathf.MoveTowards(
@@ -213,7 +222,7 @@ public class PlayerController : MonoBehaviour
     }
     #endregion
 
-#region Action Functions
+    #region Action Functions
     private void Jump()
     {
         if (wheelOnGround)
@@ -225,9 +234,9 @@ public class PlayerController : MonoBehaviour
             );
         } 
     }
-#endregion
+    #endregion
 
-#region Input Functions
+    #region Input Functions
     public void OnMove(InputAction.CallbackContext context)
     {
         moveInput = context.ReadValue<Vector2>();
@@ -249,5 +258,5 @@ public class PlayerController : MonoBehaviour
             Jump();
         }
     }
-#endregion
+    #endregion
 }
