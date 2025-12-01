@@ -28,7 +28,7 @@ public class PlayerMeshController : MonoBehaviour
     #endregion
 
     #region Update Functions
-    void Update()
+    private void FixedUpdate()
     {
         InputChange();
 
@@ -47,17 +47,17 @@ public class PlayerMeshController : MonoBehaviour
         horizontalInput = Mathf.MoveTowards(
             horizontalInput,
             playerController.moveInput.x,
-            0.1f * Time.fixedDeltaTime
+            3 * Time.fixedDeltaTime
         );
 
         // Rotates the disc3 in relation to the speed.
-        disc3.transform.localEulerAngles = new Vector3(0, disc3.transform.localEulerAngles.y + (horizontalInput / 2), 0);
+        disc3.transform.localEulerAngles = new Vector3(0, disc3.transform.localEulerAngles.y + (horizontalInput * 3), 0);
     }
 
     private void SpeedChange()
     {
         // Rotates the wheel in relation to the speed.
-        wheel.transform.localEulerAngles = new Vector3(0, wheel.transform.localEulerAngles.y + (playerController.currentSpeed*2), 0);
+        wheel.transform.localEulerAngles = new Vector3(0, wheel.transform.localEulerAngles.y + (playerController.currentSpeed * 10), 0);
     }
 
     private void DistanceChange()
