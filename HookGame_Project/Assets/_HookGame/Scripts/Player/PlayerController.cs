@@ -14,7 +14,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float maxSpeed;
     [SerializeField] float acceleration;
     [SerializeField] float maxTilt;
-    [SerializeField] bool touchingWall;
 
     [Header("Jump Stats")]
     [SerializeField] bool chargingJump;
@@ -53,7 +52,11 @@ public class PlayerController : MonoBehaviour
     #region Awake/Start Functions
     private void Start()
     {
-        jointCurrentLength = jointDefaultLength;
+        // Starts the game with the wheel recoiled.
+        canRecoil = true;
+        jointTargetLength = 0;
+        jointCurrentLength = 0;
+        wheelRB.transform.localPosition = Vector3.zero;
 
         bodyCheckRadius = CheckRadius;
         wheelCheckRadius = wheelCollider.radius + CheckRadius;
@@ -72,15 +75,6 @@ public class PlayerController : MonoBehaviour
         LayerCheck();
 
         ComponentTransform();
-
-        if (bodyRB.linearVelocity.x == 0 && moveInput.x != 0)
-        {
-            touchingWall = true;
-        }
-        else
-        {
-            touchingWall = false;
-        }
     }
 
     private void FixedUpdate()
@@ -180,7 +174,7 @@ public class PlayerController : MonoBehaviour
             // Modifies the player's speed.
             currentSpeed = Mathf.MoveTowards(
                 currentSpeed,
-                maxSpeed * moveInput.x * (touchingWall ? 0.1f : 1f), // If touching a wall, slows the player.
+                maxSpeed * moveInput.x,
                 acceleration * Time.fixedDeltaTime
             );
         }

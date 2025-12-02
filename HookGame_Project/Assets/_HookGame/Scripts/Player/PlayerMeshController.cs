@@ -10,6 +10,7 @@ public class PlayerMeshController : MonoBehaviour
     [SerializeField] GameObject eyeA;
     [SerializeField] GameObject eyeB;
     [SerializeField] GameObject wheel;
+    [SerializeField] GameObject spike;
     [SerializeField] GameObject connector;
 
     [Header("Transform stats")]
@@ -66,12 +67,12 @@ public class PlayerMeshController : MonoBehaviour
         disc2.transform.localEulerAngles = new Vector3(0, wheelRB.transform.localPosition.y * 180, 0);
 
         // Rescales the connector in relation to the distance from the wheel.
-        connector.transform.localScale = new Vector3(100, 100, 100 * wheelRB.transform.localPosition.y);
+        connector.transform.localScale = new Vector3(1, 1, wheelRB.transform.localPosition.y);
     }
 
     private void DirectionChange()
     {
-        // Sets the hook rotation.
+        // Sets the hook rotation adapted to the mesh.
         if (playerController.moveInput != Vector2.zero)
         {
             hookAngle = Snapping.Snap(
@@ -84,7 +85,7 @@ public class PlayerMeshController : MonoBehaviour
         disc1.transform.localRotation = Quaternion.RotateTowards(
             disc1.transform.localRotation,
             Quaternion.Euler(new Vector3(0, hookAngle, 0)),
-            360 * 2 * Time.deltaTime
+            360 * 1.5f * Time.deltaTime
         );
     }
 
@@ -98,11 +99,11 @@ public class PlayerMeshController : MonoBehaviour
                 0,
                 -playerController.moveInput.x * 30 + 180
             )),
-            360 * Time.deltaTime
+            360 * 0.5f * Time.deltaTime
         );
 
         // Also changes the other eye.
-        eyeB.transform.localEulerAngles = eyeA.transform.localEulerAngles;
+        eyeB.transform.localEulerAngles = -eyeA.transform.localEulerAngles;
     }
     #endregion
 }
