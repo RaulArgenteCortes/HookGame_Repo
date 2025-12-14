@@ -1,4 +1,5 @@
 using System;
+using UnityEditor.Analytics;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -29,6 +30,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float jointChargedLength;
     [SerializeField] float jointSpeed;
     [SerializeField] bool canRecoil;
+    [SerializeField] bool wheelIsClipping;
 
     [Header("LayerCheck Stats")]
     [SerializeField] float CheckRadius;
@@ -46,6 +48,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] SpringJoint joint;
     [SerializeField] GameObject connector;
     [SerializeField] GameObject bodyCheck;
+    [SerializeField] GameObject wheelCheckTop;
     [SerializeField] GameObject aimer;
     [SerializeField] GameObject bodyMesh;
 
@@ -58,6 +61,7 @@ public class PlayerController : MonoBehaviour
         jointCurrentLength = 0;
         wheelRB.transform.localPosition = Vector3.zero;
 
+        // Defines the layercheck stats.
         bodyCheckRadius = CheckRadius;
         wheelCheckRadius = wheelCollider.radius + CheckRadius;
     }
@@ -66,9 +70,7 @@ public class PlayerController : MonoBehaviour
     #region Update Functions
     private void Update()
     {
-        TiltPlayer();
-
-        JointLenght();
+        JointController();
 
         RotateHook();
 
@@ -81,28 +83,12 @@ public class PlayerController : MonoBehaviour
     {
         MovePlayer();
 
-        ModifyJoint();
+        JointModifier();
 
         CreateGravity();
     }
 
-    private void TiltPlayer()
-    {
-        // Tilts the player according to the current speed.
-        transform.rotation = Quaternion.Euler(
-            0,
-            0,
-            maxTilt * -currentSpeed
-        );
-
-        wheelRB.transform.localPosition = new Vector3(
-            0,
-            wheelRB.transform.localPosition.y,
-            0
-        );
-    }
-
-    private void JointLenght()
+    private void JointController()
     {
         if (!wheelOnGround && jointCurrentLength >= jointDefaultLength)
         {
@@ -114,22 +100,22 @@ public class PlayerController : MonoBehaviour
         }
 
         // Defines the target lenght and speed of the joint.
-        if (canRecoil)
+        if (canRecoil || wheelIsClipping)
         {
             jointTargetLength = 0;
-            jointSpeed = 5;
+            jointSpeed = (!wheelIsClipping ? 5 : 50); // Drastically increases the speed in case of clipping.
         }
         else
         {
-            if (chargingJump)
+            if (chargingJump && wheelOnGround)
             {
                 jointTargetLength = jointChargedLength;
-                jointSpeed = 1;
+                jointSpeed = (jointCurrentLength > jointTargetLength ? 1 : 5); // Only slows the speed if it has to recoil.
             }
             else
             {
                 jointTargetLength = jointDefaultLength;
-                jointSpeed = 10;
+                jointSpeed = jumpForce; // Drastically increases the speed for an illusion of push.
             }
         } 
     }
@@ -156,14 +142,19 @@ public class PlayerController : MonoBehaviour
     {
         bodyOnGround = Physics.CheckSphere(bodyCheck.transform.position, bodyCheckRadius, groundLayer);
         wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, wheelCheckRadius, groundLayer);
+
+        wheelIsClipping = Physics.CheckSphere(wheelCheckTop.transform.position, wheelCheckRadius - CheckRadius, groundLayer);
     }
 
     private void ComponentTransform()
     {
+        // Prevents the wheel from moving horizontally and streching too much.
+        wheelRB.transform.localPosition = new Vector3(0, wheelRB.transform.localPosition.y, 0);
+
         // Prevents the body mesh from tilting.
         bodyMesh.transform.rotation = Quaternion.Euler(-90, 0, 0);
 
-        // Modiffies the connector
+        // Modiffies the connector position.
         connector.transform.localPosition = wheelRB.transform.localPosition / 2;
     }
 
@@ -186,12 +177,19 @@ public class PlayerController : MonoBehaviour
             0
         ));
 
+        // Tilts the player according to the current speed.
+        transform.rotation = Quaternion.Euler(
+            0,
+            0,
+            maxTilt * -currentSpeed
+        );
+
         // Prevents the player for gaining unwanted momentum.
         bodyRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
         bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
     }
 
-    private void ModifyJoint()
+    private void JointModifier()
     {
         // Modifies the player's joint length.
         jointCurrentLength = Mathf.MoveTowards(
@@ -203,7 +201,7 @@ public class PlayerController : MonoBehaviour
         // Applies the player's joint length.
         joint.connectedAnchor = new Vector3(
             joint.connectedAnchor.x,
-            jointCurrentLength + (moveInput.y/10),
+            jointCurrentLength + (wheelOnGround ? moveInput.y/10 : 0),
             joint.connectedAnchor.z
         );
     }
@@ -212,21 +210,19 @@ public class PlayerController : MonoBehaviour
     {
         // Creates a local gravity to each part.
         bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
-        wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
+        wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);   
     }
     #endregion
 
     #region Action Functions
     private void Jump()
     {
-        if (wheelOnGround)
-        {
-            bodyRB.AddForce(
-                0,
-                jumpForce * 100 * (jointDefaultLength + jointChargedLength - jointCurrentLength),
-                0
-            );
-        } 
+        // Jumps depending on how charged is the player.
+        bodyRB.AddForce(
+            0,
+            jumpForce * 100 * (jointDefaultLength - jointCurrentLength),
+            0
+        );
     }
     #endregion
 
@@ -242,14 +238,15 @@ public class PlayerController : MonoBehaviour
         {
             chargingJump = true;
         }
-        else
-        {
-            chargingJump = false;
-        }
 
         if (context.canceled)
         {
-            Jump();
+            if (wheelOnGround)
+            {
+                Jump();
+            }
+
+            chargingJump = false;
         }
     }
     #endregion

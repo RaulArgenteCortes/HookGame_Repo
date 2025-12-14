@@ -14,12 +14,12 @@ public class PlayerMeshController : MonoBehaviour
     [SerializeField] GameObject connector;
 
     [Header("Transform stats")]
-    [SerializeField] float horizontalInput;
     [SerializeField] Rigidbody wheelRB;
-    [SerializeField] float hookAngle;
+    private float horizontalInput;
+    private float hookAngle;
 
     [Header("Script references")]
-    [SerializeField] PlayerController playerController;
+    private PlayerController playerController;
 
     #region Awake/Start Functions
     private void Start()
