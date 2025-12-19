@@ -17,29 +17,37 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float maxTilt;
 
     [Header("Jump Stats")]
-    [SerializeField] bool chargingJump;
     [SerializeField] float jumpForce;
+    private bool chargingJump;
 
     [Header("Hook Stats")]
     public float hookAngle;
 
     [Header("Joint Stats")]
-    [SerializeField] float jointCurrentLength;
-    [SerializeField] float jointTargetLength;
     [SerializeField] float jointDefaultLength;
     [SerializeField] float jointChargedLength;
-    [SerializeField] float jointSpeed;
-    [SerializeField] bool canRecoil;
-    [SerializeField] bool wheelIsClipping;
+    [SerializeField] float jointRecoiledLength;
+    private float jointCurrentLength;
+    private float jointTargetLength;
+    private float jointSpeed;
+    private bool mustRecoil;
 
     [Header("LayerCheck Stats")]
     [SerializeField] float CheckRadius;
-    private float bodyCheckRadius;
-    private float wheelCheckRadius;
-    [SerializeField] bool bodyOnGround;
-    [SerializeField] bool wheelOnGround;
-    // Layers
     [SerializeField] LayerMask groundLayer;
+    private bool bodyOnGround;
+    private bool wheelOnGround;
+    private bool againstWallL;
+    private bool againstWallR;
+    private bool wheelIsClippingL;
+    private bool wheelIsClippingR;
+
+    [Header("LayerChecks")]
+    [SerializeField] GameObject bodyCheckBottom;
+    [SerializeField] GameObject bodyCheckLeft;
+    [SerializeField] GameObject bodyCheckRight;
+    [SerializeField] GameObject wheelCheckTopL;
+    [SerializeField] GameObject wheelCheckTopR;
 
     [Header("External References")]
     [SerializeField] Rigidbody bodyRB;
@@ -47,8 +55,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] SphereCollider wheelCollider;
     [SerializeField] SpringJoint joint;
     [SerializeField] GameObject connector;
-    [SerializeField] GameObject bodyCheck;
-    [SerializeField] GameObject wheelCheckTop;
     [SerializeField] GameObject aimer;
     [SerializeField] GameObject bodyMesh;
 
@@ -56,14 +62,10 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         // Starts the game with the wheel recoiled.
-        canRecoil = true;
+        mustRecoil = true;
         jointTargetLength = 0;
         jointCurrentLength = 0;
         wheelRB.transform.localPosition = Vector3.zero;
-
-        // Defines the layercheck stats.
-        bodyCheckRadius = CheckRadius;
-        wheelCheckRadius = wheelCollider.radius + CheckRadius;
     }
     #endregion
 
@@ -85,32 +87,32 @@ public class PlayerController : MonoBehaviour
 
         JointModifier();
 
-        CreateGravity();
+        PhysicsController();
     }
 
     private void JointController()
     {
         if (!wheelOnGround && jointCurrentLength >= jointDefaultLength)
         {
-            canRecoil = true;
+            mustRecoil = true;
         }
         else if (bodyOnGround)
         {
-            canRecoil = false;
+            mustRecoil = false;
         }
 
         // Defines the target lenght and speed of the joint.
-        if (canRecoil || wheelIsClipping)
+        if (mustRecoil || (wheelIsClippingL || wheelIsClippingR))
         {
-            jointTargetLength = 0;
-            jointSpeed = (!wheelIsClipping ? 5 : 50); // Drastically increases the speed in case of clipping.
+            jointTargetLength = jointRecoiledLength;
+            jointSpeed = (!(wheelIsClippingL || wheelIsClippingR) ? 3 : 30); // Drastically increases the speed in case of clipping.
         }
         else
         {
             if (chargingJump && wheelOnGround)
             {
                 jointTargetLength = jointChargedLength;
-                jointSpeed = (jointCurrentLength > jointTargetLength ? 1 : 5); // Only slows the speed if it has to recoil.
+                jointSpeed = (jointCurrentLength > jointTargetLength ? 1 : 3); // Only slows the speed if it has to recoil.
             }
             else
             {
@@ -131,6 +133,7 @@ public class PlayerController : MonoBehaviour
             );
         }
 
+        // Just an object for debugging.
         aimer.transform.rotation = Quaternion.Euler(
             0,
             0,
@@ -140,10 +143,14 @@ public class PlayerController : MonoBehaviour
 
     private void LayerCheck()
     {
-        bodyOnGround = Physics.CheckSphere(bodyCheck.transform.position, bodyCheckRadius, groundLayer);
-        wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, wheelCheckRadius, groundLayer);
+        bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, CheckRadius, groundLayer);
+        wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, CheckRadius + wheelCollider.radius, groundLayer);
 
-        wheelIsClipping = Physics.CheckSphere(wheelCheckTop.transform.position, wheelCheckRadius - CheckRadius, groundLayer);
+        againstWallL = Physics.CheckSphere(bodyCheckLeft.transform.position, CheckRadius, groundLayer);
+        againstWallR = Physics.CheckSphere(bodyCheckRight.transform.position, CheckRadius, groundLayer);
+
+        wheelIsClippingL = Physics.CheckSphere(wheelCheckTopL.transform.position, CheckRadius, groundLayer);
+        wheelIsClippingR = Physics.CheckSphere(wheelCheckTopR.transform.position, CheckRadius, groundLayer);
     }
 
     private void ComponentTransform()
@@ -165,7 +172,9 @@ public class PlayerController : MonoBehaviour
             // Modifies the player's speed.
             currentSpeed = Mathf.MoveTowards(
                 currentSpeed,
-                maxSpeed * moveInput.x,
+                (maxSpeed * moveInput.x)
+                    * (againstWallL || againstWallR ? 0.2f : 1) // Reduces the speed when against a wall.
+                    + (wheelIsClippingL ? +0.1f : 0) + (wheelIsClippingR ? -0.1f : 0), // Helps to unclip the wheel
                 acceleration * Time.fixedDeltaTime
             );
         }
@@ -178,15 +187,7 @@ public class PlayerController : MonoBehaviour
         ));
 
         // Tilts the player according to the current speed.
-        transform.rotation = Quaternion.Euler(
-            0,
-            0,
-            maxTilt * -currentSpeed
-        );
-
-        // Prevents the player for gaining unwanted momentum.
-        bodyRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
-        bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
+        transform.rotation = Quaternion.Euler(0, 0, maxTilt * -currentSpeed);   
     }
 
     private void JointModifier()
@@ -206,11 +207,15 @@ public class PlayerController : MonoBehaviour
         );
     }
 
-    private void CreateGravity()
+    private void PhysicsController()
     {
         // Creates a local gravity to each part.
         bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
-        wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);   
+        wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
+
+        // Prevents the player for gaining unwanted momentum.
+        bodyRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
+        bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
     }
     #endregion
 
@@ -220,7 +225,7 @@ public class PlayerController : MonoBehaviour
         // Jumps depending on how charged is the player.
         bodyRB.AddForce(
             0,
-            jumpForce * 100 * (jointDefaultLength - jointCurrentLength),
+            jumpForce * 100 * (jointCurrentLength >= jointChargedLength ? (jointDefaultLength - jointCurrentLength) : jointChargedLength), // Prevents the player from jumping too much.
             0
         );
     }
