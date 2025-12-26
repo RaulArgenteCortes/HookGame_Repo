@@ -22,6 +22,8 @@ public class PlayerController : MonoBehaviour
 
     [Header("Hook Stats")]
     public float hookAngle;
+    [SerializeField] bool usingHook;
+    [SerializeField] Vector3 lockPosition;
 
     [Header("Joint Stats")]
     [SerializeField] float jointDefaultLength;
@@ -179,15 +181,18 @@ public class PlayerController : MonoBehaviour
             );
         }
 
-        // Applies the player's speed.
-        bodyRB.MovePosition(new Vector3(
-            bodyRB.transform.position.x + currentSpeed/10, // Divides it by 10 so the player doesn't go too fast.
-            bodyRB.transform.position.y,
-            0
-        ));
+        if (!usingHook)
+        {
+            // Applies the player's speed.
+            bodyRB.MovePosition(new Vector3(
+                bodyRB.transform.position.x + currentSpeed / 10, // Divides it by 10 so the player doesn't go too fast.
+                bodyRB.transform.position.y,
+                0
+            ));
 
-        // Tilts the player according to the current speed.
-        transform.rotation = Quaternion.Euler(0, 0, maxTilt * -currentSpeed);   
+            // Tilts the player according to the current speed.
+            transform.rotation = Quaternion.Euler(0, 0, maxTilt * -currentSpeed);
+        } 
     }
 
     private void JointModifier()
@@ -210,12 +215,19 @@ public class PlayerController : MonoBehaviour
     private void PhysicsController()
     {
         // Creates a local gravity to each part.
-        bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
-        wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
+        if (!usingHook)
+        {
+            bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
+            wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
+        }
+        else
+        {
+            transform.position = lockPosition;
+        }
 
         // Prevents the player for gaining unwanted momentum.
         bodyRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
-        bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
+        bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0); 
     }
     #endregion
 
@@ -225,9 +237,20 @@ public class PlayerController : MonoBehaviour
         // Jumps depending on how charged is the player.
         bodyRB.AddForce(
             0,
-            jumpForce * 100 * (jointCurrentLength >= jointChargedLength ? (jointDefaultLength - jointCurrentLength) : jointChargedLength), // Prevents the player from jumping too much.
+            jumpForce * 100 * (jointCurrentLength >= jointChargedLength ? (jointDefaultLength - jointCurrentLength) : jointChargedLength), // Prevents the player from jumping too high.
             0
         );
+    }
+
+    private void StartHook()
+    {
+        usingHook = true;
+
+        lockPosition = transform.position;
+        transform.rotation = Quaternion.Euler(0, 0, hookAngle);
+
+        // Practically deactivates the player's joint.
+        joint.connectedBody = null;
     }
     #endregion
 
@@ -241,12 +264,19 @@ public class PlayerController : MonoBehaviour
     {
         if (context.performed)
         {
-            chargingJump = true;
+            if (wheelOnGround && !usingHook)
+            {
+                chargingJump = true;
+            }
+            else if (!usingHook)
+            {
+                StartHook();
+            }
         }
 
         if (context.canceled)
         {
-            if (wheelOnGround)
+            if (wheelOnGround && !usingHook)
             {
                 Jump();
             }
