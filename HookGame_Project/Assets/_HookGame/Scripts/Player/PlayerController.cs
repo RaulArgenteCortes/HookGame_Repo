@@ -8,13 +8,14 @@ public class PlayerController : MonoBehaviour
     [Header("Physics Stats")]
     [SerializeField] float bodyWeight;
     [SerializeField] float wheelWeight;
+    [SerializeField] Vector3 lockPosition;
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
-    public float currentSpeed;
-    [SerializeField] float maxSpeed;
-    [SerializeField] float acceleration;
-    [SerializeField] float maxTilt;
+    public float moveCurrentSpeed;
+    [SerializeField] float moveMaxSpeed;
+    [SerializeField] float moveAcceleration;
+    [SerializeField] float moveMaxTilt;
 
     [Header("Jump Stats")]
     [SerializeField] float jumpForce;
@@ -22,8 +23,10 @@ public class PlayerController : MonoBehaviour
 
     [Header("Hook Stats")]
     public float hookAngle;
-    [SerializeField] bool usingHook;
-    [SerializeField] Vector3 lockPosition;
+    public bool usingHook;
+    [SerializeField] float hookDeacceleration;
+    [SerializeField] float hookStartSpeed;
+    private float hookCurrentSpeed;
 
     [Header("Joint Stats")]
     [SerializeField] float jointDefaultLength;
@@ -86,6 +89,8 @@ public class PlayerController : MonoBehaviour
     private void FixedUpdate()
     {
         MovePlayer();
+
+        HookModifier();
 
         JointModifier();
 
@@ -172,12 +177,12 @@ public class PlayerController : MonoBehaviour
         if (wheelOnGround) // Prevents controlling the movement on air.
         {
             // Modifies the player's speed.
-            currentSpeed = Mathf.MoveTowards(
-                currentSpeed,
-                (maxSpeed * moveInput.x)
+            moveCurrentSpeed = Mathf.MoveTowards(
+                moveCurrentSpeed,
+                (moveMaxSpeed * moveInput.x)
                     * (againstWallL || againstWallR ? 0.2f : 1) // Reduces the speed when against a wall.
                     + (wheelIsClippingL ? +0.1f : 0) + (wheelIsClippingR ? -0.1f : 0), // Helps to unclip the wheel
-                acceleration * Time.fixedDeltaTime
+                moveAcceleration * Time.fixedDeltaTime
             );
         }
 
@@ -185,14 +190,37 @@ public class PlayerController : MonoBehaviour
         {
             // Applies the player's speed.
             bodyRB.MovePosition(new Vector3(
-                bodyRB.transform.position.x + currentSpeed / 10, // Divides it by 10 so the player doesn't go too fast.
+                bodyRB.transform.position.x + moveCurrentSpeed / 10, // Divides it by 10 so the player doesn't go too fast.
                 bodyRB.transform.position.y,
                 0
             ));
 
             // Tilts the player according to the current speed.
-            transform.rotation = Quaternion.Euler(0, 0, maxTilt * -currentSpeed);
+            transform.rotation = Quaternion.Euler(0, 0, moveMaxTilt * -moveCurrentSpeed);
         } 
+    }
+
+    private void HookModifier()
+    {
+        if (joint.connectedBody == null)
+        {
+            hookCurrentSpeed -= hookDeacceleration;
+
+            wheelRB.transform.localPosition += new Vector3(0, -hookCurrentSpeed, 0);
+
+            if (wheelRB.transform.localPosition.y >= 0)
+            {
+                usingHook = false;
+
+                joint.connectedBody = wheelRB;
+
+                mustRecoil = true;
+                jointTargetLength = 0;
+                jointCurrentLength = 0;
+                transform.rotation = Quaternion.Euler(0, 0, 0);
+                wheelRB.transform.localPosition = Vector3.zero; 
+            }
+        }
     }
 
     private void JointModifier()
@@ -223,6 +251,9 @@ public class PlayerController : MonoBehaviour
         else
         {
             transform.position = lockPosition;
+
+            wheelRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
+            wheelRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
         }
 
         // Prevents the player for gaining unwanted momentum.
@@ -247,7 +278,11 @@ public class PlayerController : MonoBehaviour
         usingHook = true;
 
         lockPosition = transform.position;
-        transform.rotation = Quaternion.Euler(0, 0, hookAngle);
+        transform.rotation = Quaternion.Euler(0, 0, hookAngle + 180);
+
+        hookCurrentSpeed = hookStartSpeed;
+
+        wheelRB.transform.localPosition = Vector3.zero;
 
         // Practically deactivates the player's joint.
         joint.connectedBody = null;

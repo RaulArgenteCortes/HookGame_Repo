@@ -22,7 +22,7 @@ public class PlayerMeshController : MonoBehaviour
     private PlayerController playerController;
 
     #region Awake/Start Functions
-    private void Start()
+    private void Awake()
     {
         playerController = GetComponent<PlayerController>();
     }
@@ -40,6 +40,8 @@ public class PlayerMeshController : MonoBehaviour
         DirectionChange();
 
         LookChange();
+
+        HookChange();
     }
     
     private void InputChange()
@@ -58,7 +60,14 @@ public class PlayerMeshController : MonoBehaviour
     private void SpeedChange()
     {
         // Rotates the wheel in relation to the speed.
-        wheel.transform.localEulerAngles = new Vector3(0, wheel.transform.localEulerAngles.y + (playerController.currentSpeed * 10), 0);
+        if (!playerController.usingHook)
+        {
+            wheel.transform.localEulerAngles = new Vector3(0, wheel.transform.localEulerAngles.y + (playerController.moveCurrentSpeed * 10), 0);
+        }
+        else
+        {
+            wheel.transform.localEulerAngles = Vector3.zero;
+        }   
     }
 
     private void DistanceChange()
@@ -104,6 +113,18 @@ public class PlayerMeshController : MonoBehaviour
 
         // Also changes the other eye.
         eyeB.transform.localEulerAngles = -eyeA.transform.localEulerAngles;
+    }
+
+    private void HookChange()
+    {
+        if (!playerController.usingHook)
+        {
+            spike.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+        }
+        else
+        {
+            spike.transform.localScale = new Vector3(1, 1, 1);
+        }
     }
     #endregion
 }
