@@ -90,9 +90,9 @@ public class PlayerController : MonoBehaviour
     {
         MovePlayer();
 
-        HookModifier();
-
         JointModifier();
+
+        HookModifier();
 
         PhysicsController();
     }
@@ -200,29 +200,6 @@ public class PlayerController : MonoBehaviour
         } 
     }
 
-    private void HookModifier()
-    {
-        if (joint.connectedBody == null)
-        {
-            hookCurrentSpeed -= hookDeacceleration;
-
-            wheelRB.transform.localPosition += new Vector3(0, -hookCurrentSpeed, 0);
-
-            if (wheelRB.transform.localPosition.y >= 0)
-            {
-                usingHook = false;
-
-                joint.connectedBody = wheelRB;
-
-                mustRecoil = true;
-                jointTargetLength = 0;
-                jointCurrentLength = 0;
-                transform.rotation = Quaternion.Euler(0, 0, 0);
-                wheelRB.transform.localPosition = Vector3.zero; 
-            }
-        }
-    }
-
     private void JointModifier()
     {
         // Modifies the player's joint length.
@@ -235,9 +212,41 @@ public class PlayerController : MonoBehaviour
         // Applies the player's joint length.
         joint.connectedAnchor = new Vector3(
             joint.connectedAnchor.x,
-            jointCurrentLength + (wheelOnGround ? moveInput.y/10 : 0),
+            jointCurrentLength + (wheelOnGround ? moveInput.y / 10 : 0),
             joint.connectedAnchor.z
         );
+    }
+
+    private void HookModifier()
+    {
+        if (joint.connectedBody == null)
+        {
+            hookCurrentSpeed -= hookDeacceleration;
+
+            wheelRB.transform.localPosition += new Vector3(0, -hookCurrentSpeed, 0);
+
+            // Restores the player after using the hook.
+            if (wheelRB.transform.localPosition.y >= 0)
+            {
+                usingHook = false;
+
+                transform.rotation = Quaternion.Euler(0, 0, 0);
+
+                joint.connectedBody = wheelRB;
+
+                mustRecoil = false;
+                jointTargetLength = 0;
+                jointCurrentLength = 0;
+                wheelRB.transform.localPosition = Vector3.zero;
+
+                // Removes all momentum.
+                moveCurrentSpeed = 0;
+                bodyRB.linearVelocity = Vector3.zero;
+                bodyRB.angularVelocity = Vector3.zero;
+                wheelRB.linearVelocity = Vector3.zero;
+                wheelRB.angularVelocity = Vector3.zero;
+            }
+        }
     }
 
     private void PhysicsController()
@@ -286,6 +295,7 @@ public class PlayerController : MonoBehaviour
 
         // Practically deactivates the player's joint.
         joint.connectedBody = null;
+        
     }
     #endregion
 
