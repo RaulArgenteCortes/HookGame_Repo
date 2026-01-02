@@ -40,8 +40,8 @@ public class PlayerController : MonoBehaviour
     [Header("LayerCheck Stats")]
     [SerializeField] float CheckRadius;
     [SerializeField] LayerMask groundLayer;
-    private bool bodyOnGround;
-    private bool wheelOnGround;
+    [SerializeField] private bool bodyOnGround;
+    [SerializeField] private bool wheelOnGround;
     private bool againstWallL;
     private bool againstWallR;
     private bool wheelIsClippingL;
@@ -53,12 +53,11 @@ public class PlayerController : MonoBehaviour
     [SerializeField] GameObject bodyCheckRight;
     [SerializeField] GameObject wheelCheckTopL;
     [SerializeField] GameObject wheelCheckTopR;
+    [SerializeField] GameObject wheelCheckBottom;
 
     [Header("External References")]
     [SerializeField] Rigidbody bodyRB;
-    [SerializeField] Rigidbody wheelRB;
-    [SerializeField] SphereCollider wheelCollider;
-    [SerializeField] SpringJoint joint;
+    [SerializeField] CapsuleCollider wheelCollider;
     [SerializeField] GameObject connector;
     [SerializeField] GameObject aimer;
     [SerializeField] GameObject bodyMesh;
@@ -66,24 +65,29 @@ public class PlayerController : MonoBehaviour
     #region Awake/Start Functions
     private void Start()
     {
+        /*Physics.IgnoreCollision(
+            GetComponent<Collider>(),
+            wheelRB.GetComponent<Collider>()
+        );*/
+
         // Starts the game with the wheel recoiled.
-        mustRecoil = true;
+        /*mustRecoil = true;
         jointTargetLength = 0;
         jointCurrentLength = 0;
-        wheelRB.transform.localPosition = Vector3.zero;
+        wheelRB.transform.localPosition = Vector3.zero;*/
     }
     #endregion
 
     #region Update Functions
     private void Update()
     {
-        JointController();
+        //JointController();
 
         RotateHook();
 
         LayerCheck();
 
-        ComponentTransform();
+        //ComponentTransform();
     }
 
     private void FixedUpdate()
@@ -92,7 +96,7 @@ public class PlayerController : MonoBehaviour
 
         JointModifier();
 
-        HookModifier();
+        //HookModifier();
 
         PhysicsController();
     }
@@ -151,7 +155,7 @@ public class PlayerController : MonoBehaviour
     private void LayerCheck()
     {
         bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, CheckRadius, groundLayer);
-        wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, CheckRadius + wheelCollider.radius, groundLayer);
+        wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, CheckRadius, groundLayer);
 
         againstWallL = Physics.CheckSphere(bodyCheckLeft.transform.position, CheckRadius, groundLayer);
         againstWallR = Physics.CheckSphere(bodyCheckRight.transform.position, CheckRadius, groundLayer);
@@ -163,13 +167,13 @@ public class PlayerController : MonoBehaviour
     private void ComponentTransform()
     {
         // Prevents the wheel from moving horizontally and streching too much.
-        wheelRB.transform.localPosition = new Vector3(0, wheelRB.transform.localPosition.y, 0);
+        wheelCollider.center = new Vector3(0, wheelCollider.center.y, 0);
 
         // Prevents the body mesh from tilting.
         bodyMesh.transform.rotation = Quaternion.Euler(-90, 0, 0);
 
         // Modiffies the connector position.
-        connector.transform.localPosition = wheelRB.transform.localPosition / 2;
+        connector.transform.localPosition = wheelCollider.center / 2;
     }
 
     private void MovePlayer()
@@ -206,20 +210,26 @@ public class PlayerController : MonoBehaviour
         jointCurrentLength = Mathf.MoveTowards(
             jointCurrentLength,
             jointTargetLength,
-            jointSpeed * Time.deltaTime
+            0.1f
         );
 
         // Applies the player's joint length.
-        joint.connectedAnchor = new Vector3(
+        /*joint.connectedAnchor = new Vector3(
             joint.connectedAnchor.x,
             jointCurrentLength + (wheelOnGround ? moveInput.y / 10 : 0),
             joint.connectedAnchor.z
+        );*/
+
+        wheelCollider.center = new Vector3(
+            0,
+            -jointCurrentLength + (wheelOnGround ? -moveInput.y / 10 : 0),
+            0
         );
     }
 
     private void HookModifier()
     {
-        if (joint.connectedBody == null)
+        /*if (joint.connectedBody == null)
         {
             hookCurrentSpeed -= hookDeacceleration;
 
@@ -246,28 +256,18 @@ public class PlayerController : MonoBehaviour
                 wheelRB.linearVelocity = Vector3.zero;
                 wheelRB.angularVelocity = Vector3.zero;
             }
-        }
+        }*/
     }
 
     private void PhysicsController()
     {
         // Creates a local gravity to each part.
-        if (!usingHook)
-        {
-            bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
-            wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
-        }
-        else
-        {
-            transform.position = lockPosition;
-
-            wheelRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
-            wheelRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
-        }
+        bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
+        //wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
 
         // Prevents the player for gaining unwanted momentum.
-        bodyRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
-        bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0); 
+        //bodyRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
+        //bodyRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0); 
     }
     #endregion
 
@@ -291,10 +291,10 @@ public class PlayerController : MonoBehaviour
 
         hookCurrentSpeed = hookStartSpeed;
 
-        wheelRB.transform.localPosition = Vector3.zero;
+        wheelCollider.center = Vector3.zero;
 
         // Practically deactivates the player's joint.
-        joint.connectedBody = null;
+        //joint.connectedBody = null;
         
     }
     #endregion
@@ -315,7 +315,7 @@ public class PlayerController : MonoBehaviour
             }
             else if (!usingHook)
             {
-                StartHook();
+                //StartHook();
             }
         }
 

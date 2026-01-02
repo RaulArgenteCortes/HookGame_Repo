@@ -14,7 +14,8 @@ public class PlayerMeshController : MonoBehaviour
     [SerializeField] GameObject connector;
 
     [Header("Transform stats")]
-    [SerializeField] Rigidbody wheelRB;
+    [SerializeField] CapsuleCollider wheelCollider;
+    [SerializeField] GameObject wheelObject;
     private float horizontalInput;
     private float hookAngle;
 
@@ -29,6 +30,11 @@ public class PlayerMeshController : MonoBehaviour
     #endregion
 
     #region Update Functions
+    private void Update()
+    {
+        RelocateWheel();
+    }
+
     private void FixedUpdate()
     {
         InputChange();
@@ -44,6 +50,11 @@ public class PlayerMeshController : MonoBehaviour
         HookChange();
     }
     
+    private void RelocateWheel()
+    {
+        wheelObject.transform.localPosition = wheelCollider.center;
+    }
+
     private void InputChange()
     {
         // Sets the player's horizontal input whit a transition.
@@ -73,10 +84,10 @@ public class PlayerMeshController : MonoBehaviour
     private void DistanceChange()
     {
         // Rotates the disc2 in relation to the distance from the wheel.
-        disc2.transform.localEulerAngles = new Vector3(0, wheelRB.transform.localPosition.y * 180, 0);
+        disc2.transform.localEulerAngles = new Vector3(0, wheelCollider.center.y * 180, 0);
 
         // Rescales the connector in relation to the distance from the wheel.
-        connector.transform.localScale = new Vector3(1, 1, wheelRB.transform.localPosition.y);
+        connector.transform.localScale = new Vector3(1, 1, wheelCollider.center.y);
     }
 
     private void DirectionChange()
