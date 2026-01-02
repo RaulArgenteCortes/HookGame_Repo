@@ -8,7 +8,8 @@ public class PlayerController : MonoBehaviour
     [Header("Physics Stats")]
     [SerializeField] float bodyWeight;
     [SerializeField] float wheelWeight;
-    [SerializeField] Vector3 lockPosition;
+    [SerializeField] private Vector3 lockPosition;
+    [SerializeField] private bool fixedPosition;
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
@@ -68,8 +69,8 @@ public class PlayerController : MonoBehaviour
     {
         // Starts the game with the wheel recoiled.
         mustRecoil = true;
-        jointTargetLength = 0;
-        jointCurrentLength = 0;
+        jointTargetLength = jointChargedLength;
+        jointCurrentLength = jointChargedLength;
         wheelRB.transform.localPosition = Vector3.zero;
     }
     #endregion
@@ -77,13 +78,13 @@ public class PlayerController : MonoBehaviour
     #region Update Functions
     private void Update()
     {
-        JointController();
-
         RotateHook();
 
         LayerCheck();
 
         ComponentTransform();
+
+        FixPosition();
     }
 
     private void FixedUpdate()
@@ -95,38 +96,6 @@ public class PlayerController : MonoBehaviour
         HookModifier();
 
         PhysicsController();
-    }
-
-    private void JointController()
-    {
-        if (!wheelOnGround && jointCurrentLength >= jointDefaultLength)
-        {
-            mustRecoil = true;
-        }
-        else if (bodyOnGround)
-        {
-            mustRecoil = false;
-        }
-
-        // Defines the target lenght and speed of the joint.
-        if (mustRecoil || (wheelIsClippingL || wheelIsClippingR))
-        {
-            jointTargetLength = jointRecoiledLength;
-            jointSpeed = (!(wheelIsClippingL || wheelIsClippingR) ? 3 : 30); // Drastically increases the speed in case of clipping.
-        }
-        else
-        {
-            if (chargingJump && wheelOnGround)
-            {
-                jointTargetLength = jointChargedLength;
-                jointSpeed = (jointCurrentLength > jointTargetLength ? 1 : 3); // Only slows the speed if it has to recoil.
-            }
-            else
-            {
-                jointTargetLength = jointDefaultLength;
-                jointSpeed = jumpForce; // Drastically increases the speed for an illusion of push.
-            }
-        } 
     }
 
     private void RotateHook()
@@ -172,9 +141,22 @@ public class PlayerController : MonoBehaviour
         connector.transform.localPosition = wheelRB.transform.localPosition / 2;
     }
 
+    private void FixPosition()
+    {
+        if (fixedPosition)
+        {
+            transform.position = lockPosition;
+            moveCurrentSpeed = 0;
+            bodyRB.linearVelocity = Vector3.zero;
+            bodyRB.angularVelocity = Vector3.zero;
+            wheelRB.linearVelocity = Vector3.zero;
+            wheelRB.angularVelocity = Vector3.zero;
+        }
+    }
+
     private void MovePlayer()
     {
-        if (wheelOnGround) // Prevents controlling the movement on air.
+        if (wheelOnGround && !usingHook) // Prevents controlling the movement on air.
         {
             // Modifies the player's speed.
             moveCurrentSpeed = Mathf.MoveTowards(
@@ -202,12 +184,44 @@ public class PlayerController : MonoBehaviour
 
     private void JointModifier()
     {
+        if (!wheelOnGround && jointCurrentLength >= jointDefaultLength)
+        {
+            mustRecoil = true;
+        }
+        else if (bodyOnGround)
+        {
+            mustRecoil = false;
+        }
+
+        // Defines the target lenght and speed of the joint.
+        if (mustRecoil || (wheelIsClippingL || wheelIsClippingR))
+        {
+            jointTargetLength = jointRecoiledLength;
+            jointSpeed = (!(wheelIsClippingL || wheelIsClippingR) ? 3 : 30); // Drastically increases the speed in case of clipping.
+        }
+        else
+        {
+            if (chargingJump && wheelOnGround)
+            {
+                jointTargetLength = jointChargedLength;
+                jointSpeed = (jointCurrentLength > jointTargetLength ? 1 : 3); // Only slows the speed if it has to recoil.
+            }
+            else
+            {
+                jointTargetLength = jointDefaultLength;
+                jointSpeed = jumpForce; // Drastically increases the speed for an illusion of push.
+            }
+        }
+
         // Modifies the player's joint length.
-        jointCurrentLength = Mathf.MoveTowards(
-            jointCurrentLength,
-            jointTargetLength,
-            jointSpeed * Time.deltaTime
-        );
+        if (!usingHook)
+        { 
+            jointCurrentLength = Mathf.MoveTowards(
+                jointCurrentLength,
+                jointTargetLength,
+                jointSpeed * Time.deltaTime
+            );
+        }
 
         // Applies the player's joint length.
         joint.connectedAnchor = new Vector3(
@@ -221,30 +235,28 @@ public class PlayerController : MonoBehaviour
     {
         if (joint.connectedBody == null)
         {
+            // Fixes the position
+            transform.position = lockPosition;
+            wheelRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
+            wheelRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
+
             hookCurrentSpeed -= hookDeacceleration;
 
             wheelRB.transform.localPosition += new Vector3(0, -hookCurrentSpeed, 0);
 
             // Restores the player after using the hook.
-            if (wheelRB.transform.localPosition.y >= 0)
+            if (wheelRB.transform.localPosition.y >= -0.05f)
             {
                 usingHook = false;
 
                 transform.rotation = Quaternion.Euler(0, 0, 0);
 
+                // mustRecoil should be "true", but that causes errors and I dont know why.
                 joint.connectedBody = wheelRB;
-
                 mustRecoil = false;
-                jointTargetLength = 0;
-                jointCurrentLength = 0;
-                wheelRB.transform.localPosition = Vector3.zero;
 
-                // Removes all momentum.
-                moveCurrentSpeed = 0;
-                bodyRB.linearVelocity = Vector3.zero;
-                bodyRB.angularVelocity = Vector3.zero;
-                wheelRB.linearVelocity = Vector3.zero;
-                wheelRB.angularVelocity = Vector3.zero;
+                // Restores all movement.
+                fixedPosition = false;
             }
         }
     }
@@ -256,13 +268,6 @@ public class PlayerController : MonoBehaviour
         {
             bodyRB.AddForce(new Vector3(0, -bodyWeight, 0), ForceMode.Acceleration);
             wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
-        }
-        else
-        {
-            transform.position = lockPosition;
-
-            wheelRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
-            wheelRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
         }
 
         // Prevents the player for gaining unwanted momentum.
@@ -284,18 +289,19 @@ public class PlayerController : MonoBehaviour
 
     private void StartHook()
     {
-        usingHook = true;
+        hookCurrentSpeed = hookStartSpeed;
 
         lockPosition = transform.position;
         transform.rotation = Quaternion.Euler(0, 0, hookAngle + 180);
-
-        hookCurrentSpeed = hookStartSpeed;
 
         wheelRB.transform.localPosition = Vector3.zero;
 
         // Practically deactivates the player's joint.
         joint.connectedBody = null;
-        
+
+        fixedPosition = true;
+
+        usingHook = true;
     }
     #endregion
 
