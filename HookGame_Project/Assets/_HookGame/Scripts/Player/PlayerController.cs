@@ -6,10 +6,14 @@ using UnityEngine.InputSystem;
 public class PlayerController : MonoBehaviour
 {
     [Header("Physics Stats")]
+    // Body:
     [SerializeField] float bodyWeight;
+    private Vector3 bodyFixedPos;
+    private bool lockBodyPos;
+    // Wheel:
     [SerializeField] float wheelWeight;
-    [SerializeField] private Vector3 lockPosition;
-    [SerializeField] private bool fixedPosition;
+    private Vector3 wheelFixedPos;
+    private bool lockWheelPos;
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
@@ -25,9 +29,12 @@ public class PlayerController : MonoBehaviour
     [Header("Hook Stats")]
     public float hookAngle;
     public bool usingHook;
-    [SerializeField] float hookDeacceleration;
+    [SerializeField] float hookAcceleration;
     [SerializeField] float hookStartSpeed;
     private float hookCurrentSpeed;
+    private float hookWheelCurrentPos;
+    private float hookBodyCurrentPos;
+    private bool hookedSomething;
 
     [Header("Joint Stats")]
     [SerializeField] float jointDefaultLength;
@@ -41,6 +48,7 @@ public class PlayerController : MonoBehaviour
     [Header("LayerCheck Stats")]
     [SerializeField] float CheckRadius;
     [SerializeField] LayerMask groundLayer;
+    [SerializeField] LayerMask interactableLayer;
     private bool bodyOnGround;
     private bool wheelOnGround;
     private bool againstWallL;
@@ -91,18 +99,18 @@ public class PlayerController : MonoBehaviour
     {
         MovePlayer();
 
-        JointModifier();
+        JointController();
 
-        HookModifier();
+        HookControllerA();
 
         PhysicsController();
     }
 
     private void RotateHook()
     {
-        if (moveInput != Vector2.zero)
+        if (moveInput != Vector2.zero && !usingHook)
         {
-            // Converts the input vector2 into a float and snaps the value at a multiple of 45.
+            // Converts the input from a vector2 into a float and snaps the value at a multiple of 45.
             hookAngle = Snapping.Snap(
                 -Mathf.Atan2(moveInput.x, moveInput.y) * Mathf.Rad2Deg,
                 45
@@ -120,13 +128,19 @@ public class PlayerController : MonoBehaviour
     private void LayerCheck()
     {
         bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, CheckRadius, groundLayer);
-        wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, CheckRadius + wheelCollider.radius, groundLayer);
+        wheelOnGround =
+            Physics.CheckSphere(wheelRB.transform.position, CheckRadius + wheelCollider.radius, groundLayer)
+            && !usingHook;
 
         againstWallL = Physics.CheckSphere(bodyCheckLeft.transform.position, CheckRadius, groundLayer);
         againstWallR = Physics.CheckSphere(bodyCheckRight.transform.position, CheckRadius, groundLayer);
 
         wheelIsClippingL = Physics.CheckSphere(wheelCheckTopL.transform.position, CheckRadius, groundLayer);
         wheelIsClippingR = Physics.CheckSphere(wheelCheckTopR.transform.position, CheckRadius, groundLayer);
+
+        hookedSomething =
+            Physics.CheckSphere(wheelRB.transform.position, CheckRadius + wheelCollider.radius, interactableLayer)
+            && usingHook;
     }
 
     private void ComponentTransform()
@@ -143,9 +157,19 @@ public class PlayerController : MonoBehaviour
 
     private void FixPosition()
     {
-        if (fixedPosition)
+        if (lockBodyPos)
         {
-            transform.position = lockPosition;
+            transform.position = bodyFixedPos;
+            moveCurrentSpeed = 0;
+            bodyRB.linearVelocity = Vector3.zero;
+            bodyRB.angularVelocity = Vector3.zero;
+            wheelRB.linearVelocity = Vector3.zero;
+            wheelRB.angularVelocity = Vector3.zero;
+        }
+
+        if (lockWheelPos)
+        {
+            wheelRB.transform.position = wheelFixedPos;
             moveCurrentSpeed = 0;
             bodyRB.linearVelocity = Vector3.zero;
             bodyRB.angularVelocity = Vector3.zero;
@@ -182,9 +206,9 @@ public class PlayerController : MonoBehaviour
         } 
     }
 
-    private void JointModifier()
+    private void JointController()
     {
-        if (!wheelOnGround && jointCurrentLength >= jointDefaultLength)
+        if (!wheelOnGround)
         {
             mustRecoil = true;
         }
@@ -231,32 +255,44 @@ public class PlayerController : MonoBehaviour
         );
     }
 
-    private void HookModifier()
+    private void HookControllerA()
     {
-        if (joint.connectedBody == null)
+        if (joint.connectedBody == null && !hookedSomething)
         {
-            // Fixes the position
-            transform.position = lockPosition;
-            wheelRB.linearVelocity = new Vector3(0, bodyRB.linearVelocity.y, 0);
-            wheelRB.angularVelocity = new Vector3(0, bodyRB.angularVelocity.y, 0);
+            hookBodyCurrentPos = 0;
 
-            hookCurrentSpeed -= hookDeacceleration;
+            hookCurrentSpeed -= hookAcceleration;
+            hookWheelCurrentPos += hookCurrentSpeed;
 
-            wheelRB.transform.localPosition += new Vector3(0, -hookCurrentSpeed, 0);
+            wheelRB.transform.localPosition = new Vector3(0, -hookWheelCurrentPos, 0);
 
-            // Restores the player after using the hook.
-            if (wheelRB.transform.localPosition.y >= -0.05f)
+            if (wheelRB.transform.localPosition.y >= 0)
             {
-                usingHook = false;
+                hookCurrentSpeed = hookStartSpeed;
 
-                transform.rotation = Quaternion.Euler(0, 0, 0);
+                EndHook();
+            }
+        }
+        else if (joint.connectedBody == null && hookedSomething)
+        {
+            Debug.Log("Got something!");
 
-                // mustRecoil should be "true", but that causes errors and I dont know why.
-                joint.connectedBody = wheelRB;
-                mustRecoil = false;
+            wheelFixedPos = wheelRB.transform.position;
 
-                // Restores all movement.
-                fixedPosition = false;
+            lockWheelPos = true;
+            lockBodyPos = false;
+
+            hookCurrentSpeed -= hookAcceleration;
+            hookBodyCurrentPos += hookCurrentSpeed;
+
+            if (hookCurrentSpeed < 0)
+            {
+                //transform.position += new Vector3(0, -hookBodyCurrentPos, 0);
+                //wheelFixedPos -= new Vector3(0, -hookCurrentSpeed, 0);
+            }
+            else
+            {
+                //EndHook();
             }
         }
     }
@@ -290,8 +326,9 @@ public class PlayerController : MonoBehaviour
     private void StartHook()
     {
         hookCurrentSpeed = hookStartSpeed;
+        hookWheelCurrentPos = 0;
 
-        lockPosition = transform.position;
+        bodyFixedPos = transform.position;
         transform.rotation = Quaternion.Euler(0, 0, hookAngle + 180);
 
         wheelRB.transform.localPosition = Vector3.zero;
@@ -299,9 +336,25 @@ public class PlayerController : MonoBehaviour
         // Practically deactivates the player's joint.
         joint.connectedBody = null;
 
-        fixedPosition = true;
+        lockBodyPos = true;
 
         usingHook = true;
+    }
+
+    private void EndHook()
+    {
+        usingHook = false;
+
+        transform.rotation = Quaternion.Euler(0, 0, 0);
+
+        // Restores all movement.
+        lockBodyPos = false;
+        lockWheelPos = false;
+
+        // Restores the joint.
+        joint.connectedBody = wheelRB;
+        jointCurrentLength = jointDefaultLength;
+        wheelRB.transform.localPosition = Vector3.zero;
     }
     #endregion
 

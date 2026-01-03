@@ -29,6 +29,12 @@ public class PlayerMeshController : MonoBehaviour
     #endregion
 
     #region Update Functions
+    private void Update()
+    {
+        // Changes that need to be made on Update().
+        UpdateChanges();
+    }
+
     private void FixedUpdate()
     {
         InputChange();
@@ -43,8 +49,8 @@ public class PlayerMeshController : MonoBehaviour
 
         HookChange();
     }
-    
-    private void InputChange()
+
+    private void UpdateChanges()
     {
         // Sets the player's horizontal input whit a transition.
         horizontalInput = Mathf.MoveTowards(
@@ -53,6 +59,19 @@ public class PlayerMeshController : MonoBehaviour
             3 * Time.fixedDeltaTime
         );
 
+        // Sets the hook rotation adapted to the mesh.
+        if (playerController.moveInput != Vector2.zero && !playerController.usingHook)
+        {
+            hookAngle = Snapping.Snap(
+                -Mathf.Atan2(-playerController.moveInput.x, playerController.moveInput.y) * Mathf.Rad2Deg,
+                45
+            );
+        }
+    }
+
+
+    private void InputChange()
+    {
         // Rotates the disc3 in relation to the speed.
         disc3.transform.localEulerAngles = new Vector3(0, disc3.transform.localEulerAngles.y + (horizontalInput * 3), 0);
     }
@@ -81,20 +100,11 @@ public class PlayerMeshController : MonoBehaviour
 
     private void DirectionChange()
     {
-        // Sets the hook rotation adapted to the mesh.
-        if (playerController.moveInput != Vector2.zero)
-        {
-            hookAngle = Snapping.Snap(
-                -Mathf.Atan2(-playerController.moveInput.x, playerController.moveInput.y) * Mathf.Rad2Deg,
-                45
-            );
-        }
-
         // Rotates the disc1 in relation to the hook rotation.
         disc1.transform.localRotation = Quaternion.RotateTowards(
             disc1.transform.localRotation,
             Quaternion.Euler(new Vector3(0, hookAngle, 0)),
-            360 * 1.5f * Time.deltaTime
+            360 * 1.5f * Time.fixedDeltaTime
         );
     }
 
@@ -111,12 +121,13 @@ public class PlayerMeshController : MonoBehaviour
             360 * 0.5f * Time.deltaTime
         );
 
-        // Also changes the other eye.
+        // Also rotates the other eye.
         eyeB.transform.localEulerAngles = -eyeA.transform.localEulerAngles;
     }
 
     private void HookChange()
     {
+        // Makes the spike visible if using the hook
         if (!playerController.usingHook)
         {
             spike.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
