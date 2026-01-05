@@ -8,8 +8,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] float wheelWeight;
     [SerializeField] Vector3 bodyLockPosition;
     [SerializeField] Vector3 wheelLockPosition;
-    [SerializeField] bool lockBody;
-    [SerializeField] bool lockWheel;
+    [SerializeField] bool bodyLock;
+    [SerializeField] bool wheelLock;
     // Debug:
     [SerializeField] float bodyLinearVelocityX;
     [SerializeField] float wheelLinearVelocityX;
@@ -26,32 +26,49 @@ public class PlayerMovement : MonoBehaviour
     [Header("Hook Stats")]
     public float hookAngle;
     public bool usingHook;
-    [SerializeField] float hookLength;
-    [SerializeField] private Vector2 hookAngleVector;
+    [SerializeField] float hookMaxLength;
+    private Vector2 hookAngleVector;
+    [SerializeField] private bool recoverHook;
+    private bool canUseHook;
 
     [Header("Joint Stats")]
     public float jointDistance;
+    [SerializeField] float jointStrenght;
     [SerializeField] float jointDefaultLength;
     [SerializeField] float jointChargedLength;
     [SerializeField] float jointRecoiledLength;
     private float jointCurrentLenght;
 
     [Header("LayerCheck Stats")]
-    [SerializeField] float CheckRadius;
     [SerializeField] LayerMask groundLayer;
     [SerializeField] LayerMask interactableLayer;
     private bool bodyOnGround;
     private bool wheelOnGround;
+    private bool bodyTouchingInteractable;
+    private bool hookedSomething;
 
     [Header("LayerChecks")]
     [SerializeField] GameObject bodyCheckBottom;
+    [SerializeField] GameObject wheelCheckBottom;
 
     [Header("External References")]
     [SerializeField] Rigidbody bodyRB;
     [SerializeField] Rigidbody wheelRB;
+    [SerializeField] SphereCollider bodyCollider;
     [SerializeField] SphereCollider wheelCollider;
     [SerializeField] SpringJoint joint;
     [SerializeField] GameObject aimer;
+
+    #region Start/Awake Functions
+    private void Start()
+    {
+        // Starts with the hook aiming downwards.
+        hookAngle = 180;
+        hookAngleVector = new Vector2(0, -1);
+
+        joint.spring = jointStrenght;
+    }
+    #endregion
 
     #region Update Functions
     private void Update()
@@ -62,13 +79,22 @@ public class PlayerMovement : MonoBehaviour
 
         LockPosition();
 
+        HookController();
+
         bodyLinearVelocityX = bodyRB.linearVelocity.x;
         wheelLinearVelocityX = wheelRB.linearVelocity.x;
     }
 
     private void LayerCheck()
     {
-        wheelOnGround = Physics.CheckSphere(wheelRB.transform.position, CheckRadius + wheelCollider.radius, groundLayer);
+        bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.2f, groundLayer);
+        wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.2f, groundLayer);
+
+        bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.1f + bodyCollider.radius, interactableLayer);
+        
+        hookedSomething =
+            Physics.CheckSphere(wheelRB.transform.position, 0.1f + wheelCollider.radius, interactableLayer)
+            && usingHook;
     }
 
     private void ComponentTransform()
@@ -95,6 +121,7 @@ public class PlayerMovement : MonoBehaviour
                 45
             );
 
+            // A version of the move input that is never set to 0.
             hookAngleVector = moveInput;
         }
 
@@ -108,14 +135,52 @@ public class PlayerMovement : MonoBehaviour
 
     private void LockPosition()
     {
-        if (lockBody)
+        if (bodyLock)
         {
             bodyRB.transform.position = bodyLockPosition;
         }
 
-        if (lockWheel)
+        if (wheelLock)
         {
             wheelRB.transform.position = wheelLockPosition;
+        }
+    }
+
+    private void HookController()
+    {
+        if (wheelOnGround && !usingHook)
+        {
+            canUseHook = true;
+        }
+
+        if (usingHook)
+        {
+            if (hookedSomething)
+            {
+                recoverHook = true;
+
+                joint.anchor = Vector3.zero;
+
+                wheelLockPosition = wheelRB.transform.position;
+                wheelLock = true;
+                bodyLock = false;
+
+                joint.spring = jointStrenght * 2;
+            }
+
+            if (!hookedSomething && jointDistance >= hookMaxLength - 0.1f)
+            {
+                recoverHook = true;
+
+                wheelRB.linearVelocity = Vector3.zero;
+
+                joint.anchor = Vector3.zero;
+            }
+
+            if (!hookedSomething && recoverHook && jointDistance < 0.2f)
+            {
+                EndHook();
+            }
         }
     }
 
@@ -131,7 +196,7 @@ public class PlayerMovement : MonoBehaviour
     private void MovePlayer()
     {
         // Moves the player if the wheel is on the ground and the speed isn't too fast.
-        if (wheelOnGround && Mathf.Abs(bodyRB.linearVelocity.x) < moveMaxSpeed * Mathf.Abs(moveInput.x))
+        if (wheelOnGround && Mathf.Abs(bodyRB.linearVelocity.x) < moveMaxSpeed * Mathf.Abs(moveInput.x) && !usingHook)
         {
             bodyRB.AddForce(new Vector3(moveAccelerationSpeed * moveInput.x, 0, 0), ForceMode.Force);
         }
@@ -171,7 +236,11 @@ public class PlayerMovement : MonoBehaviour
                 jointCurrentLenght * (1 + moveInput.y * 0.05f),
                 0
             );
-        } 
+        }
+        else
+        {
+            joint.connectedAnchor = Vector3.zero;
+        }
     }
 
     private void PhysicsController()
@@ -203,12 +272,12 @@ public class PlayerMovement : MonoBehaviour
     #region Action Functions
     private void Jump()
     {
-        if (wheelOnGround)
+        if (wheelOnGround || (hookedSomething && recoverHook && jointDistance < 1f))
         {
             bodyRB.AddForce(new Vector3(
-            0,
-            jumpForce * (jointDefaultLength - jointDistance),
-            0
+                0,
+                jumpForce * (jointDefaultLength - jointDistance),
+                0
             ), ForceMode.Impulse);
         } 
     }
@@ -217,16 +286,19 @@ public class PlayerMovement : MonoBehaviour
     {
         if (!usingHook)
         {
+            canUseHook = false;
             usingHook = true;
 
             bodyLockPosition = bodyRB.transform.position;
-            lockBody = true;
+            bodyLock = true;
             wheelRB.transform.position = bodyRB.transform.position;
+            bodyRB.linearVelocity = Vector3.zero;
             wheelRB.linearVelocity = Vector3.zero;
 
+            // Throws the hook depending on the direction.
             joint.anchor = new Vector3(
-                hookLength * hookAngleVector.x,
-                hookLength * hookAngleVector.y,
+                hookMaxLength * hookAngleVector.x,
+                hookMaxLength * hookAngleVector.y,
                 0
             );
         }  
@@ -234,8 +306,16 @@ public class PlayerMovement : MonoBehaviour
 
     private void EndHook()
     {
-        lockBody = false;
-        lockWheel = false;
+        bodyRB.linearVelocity = Vector3.zero;
+        wheelRB.linearVelocity = Vector3.zero;
+
+        bodyLock = false;
+        wheelLock = false;
+
+        recoverHook = false;
+        usingHook = false;
+
+        joint.spring = jointStrenght;
     }
     #endregion
 
@@ -249,13 +329,19 @@ public class PlayerMovement : MonoBehaviour
     {
         if (context.performed)
         {
-            if (wheelOnGround && !usingHook)
+            if (/*wheelOnGround && */!usingHook)
             {
                 chargingJump = true;
             }
-            else if (!usingHook)
+            
+            if (canUseHook && !usingHook && !wheelOnGround)
             {
                 StartHook();
+            }
+
+            if (usingHook && recoverHook && bodyTouchingInteractable)
+            {
+                EndHook();
             }
         }
 

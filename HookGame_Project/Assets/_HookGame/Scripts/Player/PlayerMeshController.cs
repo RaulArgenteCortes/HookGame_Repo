@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[RequireComponent(typeof(PlayerController))]
+//[RequireComponent(typeof(PlayerMovement))]
 public class PlayerMeshController : MonoBehaviour
 {
     [Header("Mesh Components")]
@@ -14,64 +14,89 @@ public class PlayerMeshController : MonoBehaviour
     [SerializeField] GameObject connector;
 
     [Header("Transform stats")]
+    [SerializeField] Rigidbody bodyRB;
     [SerializeField] Rigidbody wheelRB;
     private float horizontalInput;
     private float hookAngle;
 
     [Header("Script references")]
-    private PlayerController playerController;
+    private PlayerMovement playerMovement;
 
     #region Awake/Start Functions
     private void Awake()
     {
-        playerController = GetComponent<PlayerController>();
+        playerMovement = GetComponent<PlayerMovement>();
+
+        hookAngle = 180;
     }
     #endregion
 
     #region Update Functions
     private void Update()
     {
-        // Changes that need to be made on Update().
-        UpdateChanges();
-    }
-
-    private void FixedUpdate()
-    {
-        InputChange();
-
-        SpeedChange();
-
-        DistanceChange();
-
-        DirectionChange();
+        // Sets the hook rotation adapted to the mesh.
+        if (playerMovement.moveInput != Vector2.zero && !playerMovement.usingHook)
+        {
+            hookAngle = Snapping.Snap(
+                -Mathf.Atan2(-playerMovement.moveInput.x, playerMovement.moveInput.y) * Mathf.Rad2Deg,
+                45
+            );
+        }
 
         LookChange();
 
         HookChange();
     }
 
-    private void UpdateChanges()
+    private void LookChange()
     {
-        // Sets the player's horizontal input whit a transition.
-        horizontalInput = Mathf.MoveTowards(
-            horizontalInput,
-            playerController.moveInput.x,
-            3 * Time.fixedDeltaTime
+        // Rotates the eyeA in relation to the player input.
+        eyeA.transform.localRotation = Quaternion.RotateTowards(
+            eyeA.transform.localRotation,
+            Quaternion.Euler(new Vector3(
+                playerMovement.moveInput.y * 30,
+                0,
+                -playerMovement.moveInput.x * 30 + 180
+            )),
+            360 * 0.5f * Time.fixedDeltaTime
         );
 
-        // Sets the hook rotation adapted to the mesh.
-        if (playerController.moveInput != Vector2.zero && !playerController.usingHook)
+        // Also rotates the other eye.
+        eyeB.transform.localEulerAngles = -eyeA.transform.localEulerAngles;
+    }
+
+    private void HookChange()
+    {
+        // Makes the spike visible if using the hook
+        if (!playerMovement.usingHook)
         {
-            hookAngle = Snapping.Snap(
-                -Mathf.Atan2(-playerController.moveInput.x, playerController.moveInput.y) * Mathf.Rad2Deg,
-                45
-            );
+            spike.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+        }
+        else
+        {
+            spike.transform.localScale = Vector3.one;
         }
     }
 
+    private void FixedUpdate()
+    {
+        InputChange();
+
+        SpeedChange(); // Needs revision!
+
+        DistanceChange();
+
+        DirectionChange();
+    }
 
     private void InputChange()
     {
+        horizontalInput = Mathf.MoveTowards(
+            horizontalInput,
+            playerMovement.moveInput.x,
+            3 * Time.fixedDeltaTime
+        );
+
         // Rotates the disc3 in relation to the speed.
         disc3.transform.localEulerAngles = new Vector3(0, disc3.transform.localEulerAngles.y + (horizontalInput * 3), 0);
     }
@@ -79,9 +104,9 @@ public class PlayerMeshController : MonoBehaviour
     private void SpeedChange()
     {
         // Rotates the wheel in relation to the speed.
-        if (!playerController.usingHook)
+        if (!playerMovement.usingHook)
         {
-            wheel.transform.localEulerAngles = new Vector3(0, wheel.transform.localEulerAngles.y + (playerController.moveCurrentSpeed * 10), 0);
+            wheel.transform.localEulerAngles = new Vector3(0, wheel.transform.localEulerAngles.y + (bodyRB.linearVelocity.x * 10), 0);
         }
         else
         {
@@ -92,10 +117,10 @@ public class PlayerMeshController : MonoBehaviour
     private void DistanceChange()
     {
         // Rotates the disc2 in relation to the distance from the wheel.
-        disc2.transform.localEulerAngles = new Vector3(0, wheelRB.transform.localPosition.y * 180, 0);
+        disc2.transform.localEulerAngles = new Vector3(0, playerMovement.jointDistance * 180, 0);
 
         // Rescales the connector in relation to the distance from the wheel.
-        connector.transform.localScale = new Vector3(1, 1, wheelRB.transform.localPosition.y);
+        connector.transform.localScale = new Vector3(1, 1, playerMovement.jointDistance);
     }
 
     private void DirectionChange()
@@ -106,36 +131,6 @@ public class PlayerMeshController : MonoBehaviour
             Quaternion.Euler(new Vector3(0, hookAngle, 0)),
             360 * 1.5f * Time.fixedDeltaTime
         );
-    }
-
-    private void LookChange()
-    {
-        // Rotates the eyeA in relation to the player input.
-        eyeA.transform.localRotation = Quaternion.RotateTowards(
-            eyeA.transform.localRotation,
-            Quaternion.Euler(new Vector3(
-                playerController.moveInput.y * 30,
-                0,
-                -playerController.moveInput.x * 30 + 180
-            )),
-            360 * 0.5f * Time.deltaTime
-        );
-
-        // Also rotates the other eye.
-        eyeB.transform.localEulerAngles = -eyeA.transform.localEulerAngles;
-    }
-
-    private void HookChange()
-    {
-        // Makes the spike visible if using the hook
-        if (!playerController.usingHook)
-        {
-            spike.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
-        }
-        else
-        {
-            spike.transform.localScale = new Vector3(1, 1, 1);
-        }
     }
     #endregion
 }
