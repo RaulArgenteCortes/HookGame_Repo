@@ -10,9 +10,6 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] Vector3 wheelLockPosition;
     [SerializeField] bool bodyLock;
     [SerializeField] bool wheelLock;
-    // Debug:
-    [SerializeField] float bodyLinearVelocityX;
-    [SerializeField] float wheelLinearVelocityX;
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
@@ -28,7 +25,7 @@ public class PlayerMovement : MonoBehaviour
     public bool usingHook;
     [SerializeField] float hookMaxLength;
     private Vector2 hookAngleVector;
-    [SerializeField] private bool recoverHook;
+    private bool recoverHook;
     private bool canUseHook;
 
     [Header("Joint Stats")]
@@ -80,9 +77,6 @@ public class PlayerMovement : MonoBehaviour
         LockPosition();
 
         HookController();
-
-        bodyLinearVelocityX = bodyRB.linearVelocity.x;
-        wheelLinearVelocityX = wheelRB.linearVelocity.x;
     }
 
     private void LayerCheck()
@@ -90,10 +84,10 @@ public class PlayerMovement : MonoBehaviour
         bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.2f, groundLayer);
         wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.2f, groundLayer);
 
-        bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.1f + bodyCollider.radius, interactableLayer);
+        bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.05f + bodyCollider.radius, interactableLayer);
         
         hookedSomething =
-            Physics.CheckSphere(wheelRB.transform.position, 0.1f + wheelCollider.radius, interactableLayer)
+            Physics.CheckSphere(wheelRB.transform.position, 0.05f + wheelCollider.radius, interactableLayer)
             && usingHook;
     }
 
@@ -177,7 +171,7 @@ public class PlayerMovement : MonoBehaviour
                 joint.anchor = Vector3.zero;
             }
 
-            if (!hookedSomething && recoverHook && jointDistance < 0.2f)
+            if (!hookedSomething && recoverHook && jointDistance < 0.1f)
             {
                 EndHook();
             }
