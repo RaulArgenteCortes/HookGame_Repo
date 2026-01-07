@@ -6,15 +6,14 @@ public class PlayerMovement : MonoBehaviour
     [Header("Physics Stats")]
     [SerializeField] float bodyWeight;
     [SerializeField] float wheelWeight;
-    [SerializeField] Vector3 bodyLockPosition;
-    [SerializeField] Vector3 wheelLockPosition;
-    [SerializeField] bool bodyLock;
-    [SerializeField] bool wheelLock;
+    private Vector3 bodyLockPosition;
+    private Vector3 wheelLockPosition;
+    private bool bodyLock;
+    private bool wheelLock;
 
     [Header("Movement Stats")]
     public Vector2 moveInput;
     [SerializeField] float moveAccelerationSpeed;
-    [SerializeField] float moveMaxSpeed;
 
     [Header("Jump Stats")]
     [SerializeField] float jumpForce;
@@ -39,10 +38,10 @@ public class PlayerMovement : MonoBehaviour
     [Header("LayerCheck Stats")]
     [SerializeField] LayerMask groundLayer;
     [SerializeField] LayerMask interactableLayer;
-    private bool bodyOnGround;
-    private bool wheelOnGround;
-    private bool bodyTouchingInteractable;
-    private bool hookedSomething;
+    [SerializeField] private bool bodyOnGround;
+    [SerializeField] private bool wheelOnGround;
+    [SerializeField] private bool bodyTouchingInteractable;
+    [SerializeField] private bool hookedSomething;
 
     [Header("LayerChecks")]
     [SerializeField] GameObject bodyCheckBottom;
@@ -77,35 +76,32 @@ public class PlayerMovement : MonoBehaviour
         LockPosition();
 
         HookController();
+
+        //
+        if (usingHook && (hookedSomething/* || jointDistance < bodyCollider.radius*/))
+        {
+            joint.spring = jointStrenght * 2;
+        }
+        else
+        {
+            joint.spring = jointStrenght;
+        }
     }
 
     private void LayerCheck()
     {
-        bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.2f, groundLayer);
+        bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.1f, groundLayer);
         wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.2f, groundLayer);
 
         bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.05f + bodyCollider.radius, interactableLayer);
-        
+
         hookedSomething =
-            Physics.CheckSphere(wheelRB.transform.position, 0.05f + wheelCollider.radius, interactableLayer)
+            Physics.CheckSphere(wheelRB.transform.position, 0.01f + wheelCollider.radius, interactableLayer)
             && usingHook;
     }
 
     private void ComponentTransform()
     {
-        // Calculates the distance between the body and the wheel.
-        jointDistance = Vector3.Distance(bodyRB.transform.position, wheelRB.transform.position);
-
-        // Prevents the wheel from moving too much.
-        if (!usingHook && !wheelOnGround && (bodyRB.transform.position.y - wheelRB.transform.position.y) < wheelCollider.radius)
-        {
-            wheelRB.transform.position = new Vector3(
-                bodyRB.transform.position.x,
-                wheelRB.transform.position.y,
-                wheelRB.transform.position.z
-            );
-        }
-
         // Calculates the angle of the hook.
         if (moveInput != Vector2.zero && !usingHook)
         {
@@ -158,8 +154,6 @@ public class PlayerMovement : MonoBehaviour
                 wheelLockPosition = wheelRB.transform.position;
                 wheelLock = true;
                 bodyLock = false;
-
-                joint.spring = jointStrenght * 2;
             }
 
             if (!hookedSomething && jointDistance >= hookMaxLength - 0.1f)
@@ -171,7 +165,7 @@ public class PlayerMovement : MonoBehaviour
                 joint.anchor = Vector3.zero;
             }
 
-            if (!hookedSomething && recoverHook && jointDistance < 0.1f)
+            if (!hookedSomething && recoverHook && jointDistance < 0.2f)
             {
                 EndHook();
             }
@@ -190,14 +184,27 @@ public class PlayerMovement : MonoBehaviour
     private void MovePlayer()
     {
         // Moves the player if the wheel is on the ground and the speed isn't too fast.
-        if (wheelOnGround && Mathf.Abs(bodyRB.linearVelocity.x) < moveMaxSpeed * Mathf.Abs(moveInput.x) && !usingHook)
+        if (wheelOnGround && !usingHook)
         {
             bodyRB.AddForce(new Vector3(moveAccelerationSpeed * moveInput.x, 0, 0), ForceMode.Force);
+        }
+
+        // Sligntly moves the player whes it is hooked on a wall.
+        if (hookedSomething && bodyTouchingInteractable)
+        {
+            bodyRB.AddForce(new Vector3(
+                moveInput.x * 3,
+                moveInput.y * 3,
+                0),
+            ForceMode.Force);
         }
     }
 
     private void JointController()
     {
+        // Calculates the distance between the body and the wheel.
+        jointDistance = Vector3.Distance(bodyRB.transform.position, wheelRB.transform.position);
+
         if (chargingJump && wheelOnGround)
         {
             if (jointCurrentLenght > jointChargedLength)
@@ -245,19 +252,19 @@ public class PlayerMovement : MonoBehaviour
             wheelRB.AddForce(new Vector3(0, -wheelWeight, 0), ForceMode.Acceleration);
         }
 
-        // Reduces the momentum when there is no input and the wheel is on the ground.
-        if (moveInput.x == 0 && wheelOnGround)
+        // Reduces the horizontal momentum when there is no input and the wheel is on the ground.
+        if (moveInput.x == 0 && wheelOnGround && !usingHook)
         {
             bodyRB.linearVelocity = new Vector3(
                 bodyRB.linearVelocity.x * 0.9f,
                 bodyRB.linearVelocity.y,
-                bodyRB.linearVelocity.z * 0
+                0
             );
 
             wheelRB.linearVelocity = new Vector3(
                 wheelRB.linearVelocity.x * 0.9f,
                 wheelRB.linearVelocity.y,
-                wheelRB.linearVelocity.z * 0
+                0
             );
         }
     }
@@ -308,8 +315,6 @@ public class PlayerMovement : MonoBehaviour
 
         recoverHook = false;
         usingHook = false;
-
-        joint.spring = jointStrenght;
     }
     #endregion
 

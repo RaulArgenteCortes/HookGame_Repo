@@ -1,6 +1,5 @@
 using UnityEngine;
 
-//[RequireComponent(typeof(PlayerMovement))]
 public class PlayerMeshController : MonoBehaviour
 {
     [Header("Mesh Components")]
@@ -37,6 +36,8 @@ public class PlayerMeshController : MonoBehaviour
     {
         // Some variables need to be updated here.
         VariableUpdates();
+
+        HookChange();
     }
 
     private void VariableUpdates()
@@ -49,7 +50,23 @@ public class PlayerMeshController : MonoBehaviour
                 45
             );
         }
-    } 
+    }
+
+    private void HookChange()
+    {
+        // Makes the spike visible if using the hook
+        if (!playerMovement.usingHook)
+        {
+            spike.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+        }
+        else
+        {
+            spike.transform.localScale = Vector3.one;
+        }
+
+        // Rescales the connector in relation to the distance from the wheel.
+        connector.transform.localScale = new Vector3(1, 1, playerMovement.jointDistance);
+    }
 
     private void FixedUpdate()
     {
@@ -64,8 +81,6 @@ public class PlayerMeshController : MonoBehaviour
         LookChange();
 
         WheelChange();
-
-        HookChange();
     }
 
     private void InputChange()
@@ -147,22 +162,6 @@ public class PlayerMeshController : MonoBehaviour
             -90,
             90
         );
-    }
-
-    private void HookChange()
-    {
-        // Makes the spike visible if using the hook
-        if (!playerMovement.usingHook)
-        {
-            spike.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
-        }
-        else
-        {
-            spike.transform.localScale = Vector3.one;
-        }
-
-        // Rescales the connector in relation to the distance from the wheel.
-        connector.transform.localScale = new Vector3(1, 1, playerMovement.jointDistance);
     }
     #endregion
 }
