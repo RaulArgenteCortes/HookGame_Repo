@@ -161,7 +161,7 @@ public class PlayerMeshController : MonoBehaviour
             ) * Mathf.Rad2Deg,
             -90,
             90
-        );
+        );   
     }
     #endregion
 }

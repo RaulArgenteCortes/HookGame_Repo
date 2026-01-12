@@ -41,7 +41,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private bool bodyOnGround;
     [SerializeField] private bool wheelOnGround;
     [SerializeField] private bool bodyTouchingInteractable;
-    [SerializeField] private bool hookedSomething;
+    [SerializeField] public bool hookedSomething;
 
     [Header("LayerChecks")]
     [SerializeField] GameObject bodyCheckBottom;
@@ -69,8 +69,6 @@ public class PlayerMovement : MonoBehaviour
     #region Update Functions
     private void Update()
     {
-        LayerCheck();
-
         ComponentTransform();
 
         LockPosition();
@@ -80,7 +78,7 @@ public class PlayerMovement : MonoBehaviour
         //
         if (usingHook && (hookedSomething/* || jointDistance < bodyCollider.radius*/))
         {
-            joint.spring = jointStrenght * 2;
+            joint.spring = jointStrenght * 4;
         }
         else
         {
@@ -149,7 +147,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 recoverHook = true;
 
-                joint.anchor = Vector3.zero;
+                joint.connectedAnchor = Vector3.zero;
 
                 wheelLockPosition = wheelRB.transform.position;
                 wheelLock = true;
@@ -160,9 +158,9 @@ public class PlayerMovement : MonoBehaviour
             {
                 recoverHook = true;
 
-                wheelRB.linearVelocity = Vector3.zero;
+                //wheelRB.linearVelocity = Vector3.zero;
 
-                joint.anchor = Vector3.zero;
+                joint.connectedAnchor = Vector3.zero;
             }
 
             if (!hookedSomething && recoverHook && jointDistance < 0.2f)
@@ -174,30 +172,32 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        LayerCheck();//?
+
         MovePlayer();
 
         JointController();
 
-        PhysicsController();
+        PhysicsController();   
     }
 
     private void MovePlayer()
     {
-        // Moves the player if the wheel is on the ground and the speed isn't too fast.
+        // Moves the player if the wheel is on the ground.
         if (wheelOnGround && !usingHook)
         {
             bodyRB.AddForce(new Vector3(moveAccelerationSpeed * moveInput.x, 0, 0), ForceMode.Force);
         }
 
         // Sligntly moves the player whes it is hooked on a wall.
-        if (hookedSomething && bodyTouchingInteractable)
+        /*if (hookedSomething && bodyTouchingInteractable)
         {
             bodyRB.AddForce(new Vector3(
-                moveInput.x * 3,
-                moveInput.y * 3,
+                moveInput.x * 2,
+                moveInput.y * 2,
                 0),
             ForceMode.Force);
-        }
+        }*/
     }
 
     private void JointController()
@@ -238,10 +238,6 @@ public class PlayerMovement : MonoBehaviour
                 0
             );
         }
-        else
-        {
-            joint.connectedAnchor = Vector3.zero;
-        }
     }
 
     private void PhysicsController()
@@ -273,7 +269,7 @@ public class PlayerMovement : MonoBehaviour
     #region Action Functions
     private void Jump()
     {
-        if (wheelOnGround || (hookedSomething && recoverHook && jointDistance < 1f))
+        if (wheelOnGround && !usingHook/* || (hookedSomething && recoverHook && jointDistance < 1f)*/)
         {
             bodyRB.AddForce(new Vector3(
                 0,
@@ -297,9 +293,9 @@ public class PlayerMovement : MonoBehaviour
             wheelRB.linearVelocity = Vector3.zero;
 
             // Throws the hook depending on the direction.
-            joint.anchor = new Vector3(
-                hookMaxLength * hookAngleVector.x,
-                hookMaxLength * hookAngleVector.y,
+            joint.connectedAnchor = new Vector3(
+                hookMaxLength * -hookAngleVector.x,
+                hookMaxLength * -hookAngleVector.y,
                 0
             );
         }  
