@@ -91,8 +91,11 @@ public class PlayerMeshController : MonoBehaviour
             3 * Time.fixedDeltaTime
         );
 
-        // Rotates the disc3 in relation to the speed.
-        disc3.transform.localEulerAngles = new Vector3(0, disc3.transform.localEulerAngles.y + (horizontalInput * 3), 0);
+        if (!playerMovement.usingHook)
+        {
+            // Rotates the disc3 in relation to the input.
+            disc3.transform.localEulerAngles = new Vector3(0, disc3.transform.localEulerAngles.y + (horizontalInput * 3), 0);
+        }   
     }
 
     private void SpeedChange()

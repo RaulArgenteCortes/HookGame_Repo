@@ -17,13 +17,14 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Jump Stats")]
     [SerializeField] float jumpForce;
+    [SerializeField] float wallJumpForce;
     private bool chargingJump;
 
     [Header("Hook Stats")]
     public float hookAngle;
     public bool usingHook;
     [SerializeField] float hookMaxLength;
-    private Vector2 hookAngleVector;
+    [SerializeField] private Vector2 hookAngleVector;
     private bool recoverHook;
     private bool canUseHook;
 
@@ -38,10 +39,10 @@ public class PlayerMovement : MonoBehaviour
     [Header("LayerCheck Stats")]
     [SerializeField] LayerMask groundLayer;
     [SerializeField] LayerMask interactableLayer;
-    [SerializeField] private bool bodyOnGround;
-    [SerializeField] private bool wheelOnGround;
-    [SerializeField] private bool bodyTouchingInteractable;
-    [SerializeField] public bool hookedSomething;
+    public bool hookedSomething;
+    private bool bodyOnGround;
+    private bool wheelOnGround;
+    private bool bodyTouchingInteractable;
 
     [Header("LayerChecks")]
     [SerializeField] GameObject bodyCheckBottom;
@@ -74,28 +75,6 @@ public class PlayerMovement : MonoBehaviour
         LockPosition();
 
         HookController();
-
-        //
-        if (usingHook && (hookedSomething/* || jointDistance < bodyCollider.radius*/))
-        {
-            joint.spring = jointStrenght * 4;
-        }
-        else
-        {
-            joint.spring = jointStrenght;
-        }
-    }
-
-    private void LayerCheck()
-    {
-        bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.1f, groundLayer);
-        wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.2f, groundLayer);
-
-        bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.05f + bodyCollider.radius, interactableLayer);
-
-        hookedSomething =
-            Physics.CheckSphere(wheelRB.transform.position, 0.01f + wheelCollider.radius, interactableLayer)
-            && usingHook;
     }
 
     private void ComponentTransform()
@@ -110,7 +89,10 @@ public class PlayerMovement : MonoBehaviour
             );
 
             // A version of the move input that is never set to 0.
-            hookAngleVector = moveInput;
+            hookAngleVector = new Vector2(
+                -Mathf.Sin(hookAngle * Mathf.Deg2Rad),
+                Mathf.Cos(hookAngle * Mathf.Deg2Rad)
+            ); // Sin and Cos MAY be swapped, but on this case that is irrelevant.
         }
 
         // Just an object for debugging.
@@ -119,6 +101,16 @@ public class PlayerMovement : MonoBehaviour
             0,
             hookAngle
         );
+
+        // Modifies the spring value of the joint.
+        if (usingHook && hookedSomething)
+        {
+            joint.spring = jointStrenght * 2;
+        }
+        else
+        {
+            joint.spring = jointStrenght;
+        }
     }
 
     private void LockPosition()
@@ -172,13 +164,25 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        LayerCheck();//?
+        LayerCheck();
 
         MovePlayer();
 
         JointController();
 
         PhysicsController();   
+    }
+
+    private void LayerCheck()
+    {
+        bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.1f, groundLayer);
+        wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.2f, groundLayer);
+
+        bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.05f + bodyCollider.radius, interactableLayer);
+
+        hookedSomething =
+            Physics.CheckSphere(wheelRB.transform.position, 0.01f + wheelCollider.radius, interactableLayer)
+            && usingHook;
     }
 
     private void MovePlayer()
@@ -188,16 +192,6 @@ public class PlayerMovement : MonoBehaviour
         {
             bodyRB.AddForce(new Vector3(moveAccelerationSpeed * moveInput.x, 0, 0), ForceMode.Force);
         }
-
-        // Sligntly moves the player whes it is hooked on a wall.
-        /*if (hookedSomething && bodyTouchingInteractable)
-        {
-            bodyRB.AddForce(new Vector3(
-                moveInput.x * 2,
-                moveInput.y * 2,
-                0),
-            ForceMode.Force);
-        }*/
     }
 
     private void JointController()
@@ -254,13 +248,13 @@ public class PlayerMovement : MonoBehaviour
             bodyRB.linearVelocity = new Vector3(
                 bodyRB.linearVelocity.x * 0.9f,
                 bodyRB.linearVelocity.y,
-                0
+                bodyRB.linearVelocity.z
             );
 
             wheelRB.linearVelocity = new Vector3(
                 wheelRB.linearVelocity.x * 0.9f,
                 wheelRB.linearVelocity.y,
-                0
+                wheelRB.linearVelocity.z
             );
         }
     }
@@ -269,7 +263,7 @@ public class PlayerMovement : MonoBehaviour
     #region Action Functions
     private void Jump()
     {
-        if (wheelOnGround && !usingHook/* || (hookedSomething && recoverHook && jointDistance < 1f)*/)
+        if (wheelOnGround && !usingHook)
         {
             bodyRB.AddForce(new Vector3(
                 0,
@@ -308,6 +302,15 @@ public class PlayerMovement : MonoBehaviour
 
         bodyLock = false;
         wheelLock = false;
+        
+        if (hookedSomething) // Makes a walljump depending of the hook's angle.
+        {
+            bodyRB.AddForce(new Vector3(
+                (wallJumpForce/2) * -hookAngleVector.x,
+                (wallJumpForce/2) * -hookAngleVector.y + (wallJumpForce/2),
+                0
+            ), ForceMode.Impulse);
+        }
 
         recoverHook = false;
         usingHook = false;
@@ -324,25 +327,24 @@ public class PlayerMovement : MonoBehaviour
     {
         if (context.performed)
         {
-            if (/*wheelOnGround && */!usingHook)
-            {
-                chargingJump = true;
-            }
+            chargingJump = true;
             
             if (canUseHook && !usingHook && !wheelOnGround)
             {
                 StartHook();
             }
-
-            if (usingHook && recoverHook && bodyTouchingInteractable)
-            {
-                EndHook();
-            }
         }
 
         if (context.canceled)
         {
-            Jump();
+            if (usingHook && recoverHook && bodyTouchingInteractable)
+            {
+                EndHook();
+            }
+            else
+            {
+                Jump();
+            } 
 
             chargingJump = false;
         }
