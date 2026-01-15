@@ -22,14 +22,15 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Hook Stats")]
     public float hookAngle;
+    public Vector3 hookAngleVector;
     public bool usingHook;
     [SerializeField] float hookMaxLength;
-    [SerializeField] private Vector2 hookAngleVector;
     private bool recoverHook;
     private bool canUseHook;
 
     [Header("Joint Stats")]
     public float jointDistance;
+    public float jointAngleVector;
     [SerializeField] float jointStrenght;
     [SerializeField] float jointDefaultLength;
     [SerializeField] float jointChargedLength;
@@ -37,9 +38,9 @@ public class PlayerMovement : MonoBehaviour
     private float jointCurrentLenght;
 
     [Header("LayerCheck Stats")]
+    public bool hookedSomething;
     [SerializeField] LayerMask groundLayer;
     [SerializeField] LayerMask interactableLayer;
-    public bool hookedSomething;
     private bool bodyOnGround;
     private bool wheelOnGround;
     private bool bodyTouchingInteractable;
@@ -92,7 +93,7 @@ public class PlayerMovement : MonoBehaviour
             hookAngleVector = new Vector2(
                 -Mathf.Sin(hookAngle * Mathf.Deg2Rad),
                 Mathf.Cos(hookAngle * Mathf.Deg2Rad)
-            ); // Sin and Cos MAY be swapped, but on this case that is irrelevant.
+            );
         }
 
         // Just an object for debugging.
@@ -105,12 +106,14 @@ public class PlayerMovement : MonoBehaviour
         // Modifies the spring value of the joint.
         if (usingHook && hookedSomething)
         {
-            joint.spring = jointStrenght * 2;
+            joint.spring = jointStrenght * 4;
         }
         else
         {
             joint.spring = jointStrenght;
         }
+
+        jointAngleVector = Vector3.Angle(bodyRB.transform.up, (wheelRB.transform.position - bodyRB.transform.position));
     }
 
     private void LockPosition()
@@ -150,12 +153,10 @@ public class PlayerMovement : MonoBehaviour
             {
                 recoverHook = true;
 
-                //wheelRB.linearVelocity = Vector3.zero;
-
                 joint.connectedAnchor = Vector3.zero;
             }
 
-            if (!hookedSomething && recoverHook && jointDistance < 0.2f)
+            if (!hookedSomething && recoverHook && jointDistance < 0.15f)
             {
                 EndHook();
             }
@@ -164,7 +165,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        LayerCheck();
+        LayerCheck(); // Putting this here prevents the bools from flashing.
 
         MovePlayer();
 
@@ -176,7 +177,7 @@ public class PlayerMovement : MonoBehaviour
     private void LayerCheck()
     {
         bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.1f, groundLayer);
-        wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.2f, groundLayer);
+        wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.3f, groundLayer);
 
         bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.05f + bodyCollider.radius, interactableLayer);
 
@@ -303,11 +304,13 @@ public class PlayerMovement : MonoBehaviour
         bodyLock = false;
         wheelLock = false;
         
-        if (hookedSomething) // Makes a walljump depending of the hook's angle.
+        if (hookedSomething) // Makes a walljump depending of the joint's angle.
         {
             bodyRB.AddForce(new Vector3(
-                (wallJumpForce/2) * -hookAngleVector.x,
-                (wallJumpForce/2) * -hookAngleVector.y + (wallJumpForce/2),
+                (wallJumpForce/2) * -Mathf.Sin(jointAngleVector * Mathf.Deg2Rad)
+                    * (wheelRB.transform.position.x > bodyRB.transform.position.x ? 1 : -1), // Just a corrector.
+                (wallJumpForce/2) * -Mathf.Cos(jointAngleVector * Mathf.Deg2Rad)
+                    + (wallJumpForce/2), // Always adds a vertical force.
                 0
             ), ForceMode.Impulse);
         }
