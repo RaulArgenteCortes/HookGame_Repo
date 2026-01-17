@@ -56,6 +56,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] SphereCollider bodyCollider;
     [SerializeField] SphereCollider wheelCollider;
     [SerializeField] SpringJoint joint;
+    [SerializeField] GameObject spawnPoint;
     [SerializeField] GameObject aimer;
 
     #region Start/Awake Functions
@@ -139,7 +140,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 recoverHook = true;
 
-                joint.connectedAnchor = jointAngleVector * 2; // This makes the hook more stronger.
+                joint.connectedAnchor = jointAngleVector * 3; // This makes the hook more stronger.
 
                 wheelLockPosition = wheelRB.transform.position;
                 wheelLock = true;
@@ -316,6 +317,20 @@ public class PlayerMovement : MonoBehaviour
         }
 
         wheelRB.transform.position = bodyRB.transform.position;
+
+        recoverHook = false;
+        usingHook = false;
+    }
+
+    public void Respawn()
+    {
+        bodyRB.linearVelocity = Vector3.zero;
+        wheelRB.linearVelocity = Vector3.zero;
+
+        bodyLock = false;
+        wheelLock = false;
+
+        bodyRB.transform.position = wheelRB.transform.position = spawnPoint.transform.position;
 
         recoverHook = false;
         usingHook = false;
