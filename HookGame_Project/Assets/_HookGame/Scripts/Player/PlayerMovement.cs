@@ -6,8 +6,8 @@ public class PlayerMovement : MonoBehaviour
     [Header("Physics Stats")]
     [SerializeField] float bodyWeight;
     [SerializeField] float wheelWeight;
-    private Vector3 bodyLockPosition;
-    private Vector3 wheelLockPosition;
+    public Vector3 bodyLockPosition;
+    public Vector3 wheelLockPosition;
     private bool bodyLock;
     private bool wheelLock;
 
@@ -22,20 +22,21 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Hook Stats")]
     public float hookAngle;
-    public Vector3 hookAngleVector;
+    public Vector2 hookAngleVector;
     public bool usingHook;
+    public bool canUseHook;
     [SerializeField] float hookMaxLength;
     private bool recoverHook;
-    private bool canUseHook;
 
     [Header("Joint Stats")]
     public float jointDistance;
-    public float jointAngleVector;
-    [SerializeField] float jointStrenght;
+    public float jointAngle;
+    public Vector2 jointAngleVector;
     [SerializeField] float jointDefaultLength;
     [SerializeField] float jointChargedLength;
     [SerializeField] float jointRecoiledLength;
     private float jointCurrentLenght;
+    private bool wheelAtLeft;
 
     [Header("LayerCheck Stats")]
     public bool hookedSomething;
@@ -43,7 +44,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] LayerMask interactableLayer;
     private bool bodyOnGround;
     private bool wheelOnGround;
-    private bool bodyTouchingInteractable;
+    private bool bodyTouchingGround;
 
     [Header("LayerChecks")]
     [SerializeField] GameObject bodyCheckBottom;
@@ -63,22 +64,20 @@ public class PlayerMovement : MonoBehaviour
         // Starts with the hook aiming downwards.
         hookAngle = 180;
         hookAngleVector = new Vector2(0, -1);
-
-        joint.spring = jointStrenght;
     }
     #endregion
 
     #region Update Functions
     private void Update()
     {
-        ComponentTransform();
+        CalculateAngles();
 
         LockPosition();
 
         HookController();
     }
 
-    private void ComponentTransform()
+    private void CalculateAngles()
     {
         // Calculates the angle of the hook.
         if (moveInput != Vector2.zero && !usingHook)
@@ -89,12 +88,22 @@ public class PlayerMovement : MonoBehaviour
                 45
             );
 
-            // A version of the move input that is never set to 0.
+            // A vector2 version of hookAngle.
             hookAngleVector = new Vector2(
                 -Mathf.Sin(hookAngle * Mathf.Deg2Rad),
                 Mathf.Cos(hookAngle * Mathf.Deg2Rad)
             );
         }
+
+        // Calculates the angle of the joint.
+        jointAngle = Vector2.Angle(bodyRB.transform.up, (wheelRB.transform.position - bodyRB.transform.position));
+
+        // A vector2 version of jointAngle.
+        jointAngleVector = new Vector2(
+            Mathf.Sin(jointAngle * Mathf.Deg2Rad)
+                * (wheelAtLeft ? -1 : 1), // Just a corrector.
+            Mathf.Cos(jointAngle * Mathf.Deg2Rad)
+        );
 
         // Just an object for debugging.
         aimer.transform.rotation = Quaternion.Euler(
@@ -102,18 +111,6 @@ public class PlayerMovement : MonoBehaviour
             0,
             hookAngle
         );
-
-        // Modifies the spring value of the joint.
-        if (usingHook && hookedSomething)
-        {
-            joint.spring = jointStrenght * 4;
-        }
-        else
-        {
-            joint.spring = jointStrenght;
-        }
-
-        jointAngleVector = Vector3.Angle(bodyRB.transform.up, (wheelRB.transform.position - bodyRB.transform.position));
     }
 
     private void LockPosition()
@@ -142,7 +139,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 recoverHook = true;
 
-                joint.connectedAnchor = Vector3.zero;
+                joint.connectedAnchor = jointAngleVector * 2; // This makes the hook more stronger.
 
                 wheelLockPosition = wheelRB.transform.position;
                 wheelLock = true;
@@ -171,7 +168,7 @@ public class PlayerMovement : MonoBehaviour
 
         JointController();
 
-        PhysicsController();   
+        PhysicsController();
     }
 
     private void LayerCheck()
@@ -179,7 +176,7 @@ public class PlayerMovement : MonoBehaviour
         bodyOnGround = Physics.CheckSphere(bodyCheckBottom.transform.position, 0.1f, groundLayer);
         wheelOnGround = Physics.CheckSphere(wheelCheckBottom.transform.position, 0.3f, groundLayer);
 
-        bodyTouchingInteractable = Physics.CheckSphere(bodyRB.transform.position, 0.05f + bodyCollider.radius, interactableLayer);
+        bodyTouchingGround = Physics.CheckSphere(bodyRB.transform.position, 0.05f + bodyCollider.radius, groundLayer);
 
         hookedSomething =
             Physics.CheckSphere(wheelRB.transform.position, 0.01f + wheelCollider.radius, interactableLayer)
@@ -233,6 +230,9 @@ public class PlayerMovement : MonoBehaviour
                 0
             );
         }
+
+        // Calculates the horizontal position of the wheel.
+        wheelAtLeft = wheelRB.transform.position.x < bodyRB.transform.position.x;
     }
 
     private void PhysicsController()
@@ -296,24 +296,26 @@ public class PlayerMovement : MonoBehaviour
         }  
     }
 
-    private void EndHook()
+    public void EndHook()
     {
         bodyRB.linearVelocity = Vector3.zero;
         wheelRB.linearVelocity = Vector3.zero;
 
         bodyLock = false;
         wheelLock = false;
-        
-        if (hookedSomething) // Makes a walljump depending of the joint's angle.
+
+        if (hookedSomething && bodyTouchingGround) 
         {
+            // Makes a walljump depending of the joint's angle.
             bodyRB.AddForce(new Vector3(
-                (wallJumpForce/2) * -Mathf.Sin(jointAngleVector * Mathf.Deg2Rad)
-                    * (wheelRB.transform.position.x > bodyRB.transform.position.x ? 1 : -1), // Just a corrector.
-                (wallJumpForce/2) * -Mathf.Cos(jointAngleVector * Mathf.Deg2Rad)
+                (wallJumpForce/2) * -jointAngleVector.x,
+                (wallJumpForce/2) * -jointAngleVector.y
                     + (wallJumpForce/2), // Always adds a vertical force.
                 0
             ), ForceMode.Impulse);
         }
+
+        wheelRB.transform.position = bodyRB.transform.position;
 
         recoverHook = false;
         usingHook = false;
@@ -340,7 +342,7 @@ public class PlayerMovement : MonoBehaviour
 
         if (context.canceled)
         {
-            if (usingHook && recoverHook && bodyTouchingInteractable)
+            if (usingHook && recoverHook && bodyTouchingGround)
             {
                 EndHook();
             }

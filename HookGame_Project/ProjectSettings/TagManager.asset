@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 3
   tags:
   - Solid
+  - PlayerWheel
   layers:
   - Default
   - TransparentFX
