@@ -32,6 +32,7 @@ public class PlayerMovement : MonoBehaviour
     public float jointDistance;
     public float jointAngle;
     public Vector2 jointAngleVector;
+    [SerializeField] float jointSpring;
     [SerializeField] float jointDefaultLength;
     [SerializeField] float jointChargedLength;
     [SerializeField] float jointRecoiledLength;
@@ -76,6 +77,8 @@ public class PlayerMovement : MonoBehaviour
         LockPosition();
 
         HookController();
+
+        RespawnController();
     }
 
     private void CalculateAngles()
@@ -140,7 +143,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 recoverHook = true;
 
-                joint.connectedAnchor = jointAngleVector * 3; // This makes the hook more stronger.
+                joint.connectedAnchor = Vector3.zero;
 
                 wheelLockPosition = wheelRB.transform.position;
                 wheelLock = true;
@@ -158,6 +161,14 @@ public class PlayerMovement : MonoBehaviour
             {
                 EndHook();
             }
+        }
+    }
+
+    private void RespawnController()
+    {
+        if (bodyRB.transform.position.y < -10)
+        {
+            Respawn();
         }
     }
 
@@ -195,6 +206,16 @@ public class PlayerMovement : MonoBehaviour
 
     private void JointController()
     {
+        // Increases the spring joint when something is hooked.
+        if (usingHook && wheelLock && !bodyLock)
+        {
+            joint.spring = jointSpring * 10;
+        }
+        else
+        {
+            joint.spring = jointSpring;
+        }
+
         // Calculates the distance between the body and the wheel.
         jointDistance = Vector3.Distance(bodyRB.transform.position, wheelRB.transform.position);
 
