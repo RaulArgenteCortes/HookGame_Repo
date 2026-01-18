@@ -1,0 +1,35 @@
+{
+    "version": 1,
+    "name": "IA_MenuController",
+    "maps": [
+        {
+            "name": "UI",
+            "id": "d0a45818-263b-4ead-99cb-0d5d98681ddd",
+            "actions": [
+                {
+                    "name": "QuitGame",
+                    "type": "Button",
+                    "id": "13a3a296-c55c-4219-830f-72fca9b047e7",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "a807c34e-0320-47b9-bee2-552eb7a9fae4",
+                    "path": "<Keyboard>/escape",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "QuitGame",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
