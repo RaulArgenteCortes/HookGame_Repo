@@ -18,7 +18,6 @@ public class Bouncer : MonoBehaviour
     private void Awake()
     {
         player = GameObject.FindWithTag("Player");
-
         playerRB = player.GetComponent<Rigidbody>();
         playerMovement = player.GetComponent<PlayerMovement>();
     }
@@ -27,9 +26,11 @@ public class Bouncer : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            if (playerMovement.hookedSomething)
+            if (playerMovement.hookedSomething && playerMovement.wheelLockPosition == transform.position)
             {
                 playerMovement.EndHook();
+
+                playerRB.transform.position = transform.position;
 
                 playerRB.AddForce(new Vector3(
                     (bounceForce/2) * playerMovement.hookAngleVector.x,

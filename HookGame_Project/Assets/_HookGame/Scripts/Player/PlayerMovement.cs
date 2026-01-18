@@ -132,7 +132,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void HookController()
     {
-        if (wheelOnGround && !usingHook)
+        if ((wheelOnGround && !usingHook) || hookedSomething)
         {
             canUseHook = true;
         }
@@ -333,6 +333,16 @@ public class PlayerMovement : MonoBehaviour
                 (wallJumpForce/2) * -jointAngleVector.x,
                 (wallJumpForce/2) * -jointAngleVector.y
                     + (wallJumpForce/2), // Always adds a vertical force.
+                0
+            ), ForceMode.Impulse);
+        }
+
+        // Pushes the player back if it didn't hook something.
+        if (!hookedSomething)
+        {
+            bodyRB.AddForce(new Vector3(
+                5 * -hookAngleVector.x,
+                5 * -hookAngleVector.y + 5/2,
                 0
             ), ForceMode.Impulse);
         }

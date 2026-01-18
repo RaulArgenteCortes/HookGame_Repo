@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Solid
   - PlayerWheel
+  - PlayerSpawn
   layers:
   - Default
   - TransparentFX
