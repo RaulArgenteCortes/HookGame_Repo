@@ -355,9 +355,6 @@ public class PlayerMovement : MonoBehaviour
 
     public void Respawn()
     {
-        bodyRB.linearVelocity = Vector3.zero;
-        wheelRB.linearVelocity = Vector3.zero;
-
         bodyLock = false;
         wheelLock = false;
 
@@ -365,6 +362,9 @@ public class PlayerMovement : MonoBehaviour
 
         recoverHook = false;
         usingHook = false;
+
+        bodyRB.linearVelocity = Vector3.zero;
+        wheelRB.linearVelocity = Vector3.zero;
     }
     #endregion
 
